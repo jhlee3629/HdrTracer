@@ -2,6 +2,10 @@
 
 [한국어](README.md) | English
 
+<img src="docs/1.png" width="700" alt="HdrTracer main window">
+
+<img src="docs/2.png" width="700" alt="Extension (txt) search results">
+
 A fast file search tool for Windows that finds files on NTFS drives by name.
 
 ## Features

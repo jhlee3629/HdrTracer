@@ -2,6 +2,10 @@
 
 한국어 | [English](README.en.md)
 
+<img src="docs/1.png" width="700" alt="HdrTracer 메인 화면">
+
+<img src="docs/2.png" width="700" alt="확장자(txt) 검색 결과">
+
 NTFS 드라이브의 파일을 이름으로 빠르게 찾는 윈도우용 검색 도구.
 
 ## 기능
