@@ -1,5 +1,7 @@
 # HdrTracer
 
+[한국어](README.md) | English
+
 A fast file search tool for Windows that finds files on NTFS drives by name.
 
 ## Features
@@ -25,7 +27,7 @@ Because of this, a UAC prompt appears each time the app starts.
 
 ## Installation
 
-Download `HdrTracer_Setup_1.0.0.exe` from the [installer](../../installer) and run it.
+Download `HdrTracer_Setup_1.0.0.exe` from the [Releases page](../../releases/latest) and run it.
 
 The installer and executable are not code-signed, so the first time you run them
 Windows may show a "Windows protected your PC" (SmartScreen) warning.
