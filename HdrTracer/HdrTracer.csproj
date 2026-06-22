@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationIcon>Assets\sun.ico</ApplicationIcon>
+    <Platforms>x64</Platforms>
+
+    <!-- 관리자 권한 자동 요청을 위한 manifest -->
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+
+    <!-- WindowsForms용 HiDPI 설정 (PerMonitorV2: 4K 모니터에서 선명) -->
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+
+    <!-- 앱 메타데이터 (Windows 파일 속성 창에 표시됨) -->
+    <AssemblyName>HdrTracer</AssemblyName>
+    <RootNamespace>HdrTracer.App</RootNamespace>
+    <Product>HdrTracer</Product>
+    <AssemblyTitle>HdrTracer - Fast File Search</AssemblyTitle>
+    <Description>NTFS raw MFT 기반 초고속 파일 검색기</Description>
+    <Company>HdrTracer</Company>
+    <Copyright>Copyright © 2026</Copyright>
+    <Version>1.0.0</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+
+    <!-- 단일 exe 배포 빌드 옵션 (dotnet publish 명령에서만 의미 있음) -->
+    <PublishSingleFile>true</PublishSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\sun.ico" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\HdrTracer.Core\HdrTracer.Core.csproj" />
+  </ItemGroup>
+</Project>

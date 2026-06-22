@@ -1,0 +1,58 @@
+# ============================================================
+#  HdrTracer .gitignore  (.NET 8 / WPF + VS Code + Inno Setup)
+# ============================================================
+
+# --- 빌드 산출물 ---
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Ww][Ii][Nn]32/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+publish/
+*.dll
+*.exe
+*.pdb
+
+# --- Inno Setup 인스톨러 출력 (setup.exe는 GitHub Releases로 배포 권장) ---
+/Installer/
+*.iss.bak
+
+# --- C# Dev Kit / 언어 서버 캐시 ---
+*.lscache
+
+# --- Visual Studio / VS Code ---
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.vscode/*
+!.vscode/launch.json
+!.vscode/tasks.json
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# --- NuGet ---
+*.nupkg
+*.snupkg
+**/packages/*
+!**/packages/build/
+project.lock.json
+project.fragment.lock.json
+
+# --- 테스트/커버리지 ---
+[Tt]est[Rr]esult*/
+*.coverage
+*.coveragexml
+
+# --- OS 잡파일 ---
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store

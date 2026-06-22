@@ -1,0 +1,34 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HdrTracer", "HdrTracer\HdrTracer.csproj", "{3F78599C-55A7-4D74-9BCA-473B679BACE8}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HdrTracer.Core", "HdrTracer.Core\HdrTracer.Core.csproj", "{1042AD94-039E-4608-AF51-E0159985B274}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HdrTracer.MftProbe", "HdrTracer.MftProbe\HdrTracer.MftProbe.csproj", "{FB1D5C92-2EBD-440B-82A0-504FCF0571C8}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{3F78599C-55A7-4D74-9BCA-473B679BACE8}.Debug|Any CPU.ActiveCfg = Debug|x64
+		{3F78599C-55A7-4D74-9BCA-473B679BACE8}.Debug|Any CPU.Build.0 = Debug|x64
+		{3F78599C-55A7-4D74-9BCA-473B679BACE8}.Release|Any CPU.ActiveCfg = Release|x64
+		{3F78599C-55A7-4D74-9BCA-473B679BACE8}.Release|Any CPU.Build.0 = Release|x64
+		{1042AD94-039E-4608-AF51-E0159985B274}.Debug|Any CPU.ActiveCfg = Debug|x64
+		{1042AD94-039E-4608-AF51-E0159985B274}.Debug|Any CPU.Build.0 = Debug|x64
+		{1042AD94-039E-4608-AF51-E0159985B274}.Release|Any CPU.ActiveCfg = Release|x64
+		{1042AD94-039E-4608-AF51-E0159985B274}.Release|Any CPU.Build.0 = Release|x64
+		{FB1D5C92-2EBD-440B-82A0-504FCF0571C8}.Debug|Any CPU.ActiveCfg = Debug|x64
+		{FB1D5C92-2EBD-440B-82A0-504FCF0571C8}.Debug|Any CPU.Build.0 = Debug|x64
+		{FB1D5C92-2EBD-440B-82A0-504FCF0571C8}.Release|Any CPU.ActiveCfg = Release|x64
+		{FB1D5C92-2EBD-440B-82A0-504FCF0571C8}.Release|Any CPU.Build.0 = Release|x64
+	EndGlobalSection
+EndGlobal

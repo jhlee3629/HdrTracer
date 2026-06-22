@@ -1,0 +1,98 @@
+using System.Windows;
+using HdrTracer.Core;
+using Loc = HdrTracer.Core.Localization;
+
+namespace HdrTracer.App;
+
+public partial class SettingsWindow : Window
+{
+    public AppSettings Settings { get; }
+    public bool RemovableChanged { get; private set; }
+    public bool HiddenSystemChanged { get; private set; }
+
+    private readonly bool _initialRemovable;
+    private readonly bool _initialShowHidden;
+
+    public SettingsWindow(AppSettings settings)
+    {
+        InitializeComponent();
+        Settings = settings;
+        _initialRemovable = settings.IndexRemovableDrives;
+        _initialShowHidden = settings.ShowHiddenSystemItems;
+        RemovableCheckBox.IsChecked = settings.IndexRemovableDrives;
+        TrayCheckBox.IsChecked = settings.MinimizeToTrayOnClose;
+        HiddenSystemCheckBox.IsChecked = settings.ShowHiddenSystemItems;
+
+        ApplyTexts();
+
+        // Esc로 취소, Enter로 확인
+        PreviewKeyDown += (_, e) =>
+        {
+            if (e.Key == System.Windows.Input.Key.Escape)
+            {
+                DialogResult = false;
+                Close();
+                e.Handled = true;
+            }
+            else if (e.Key == System.Windows.Input.Key.Enter)
+            {
+                OkButton_Click(this, new RoutedEventArgs());
+                e.Handled = true;
+            }
+        };
+    }
+
+    private void ApplyTexts()
+    {
+        Title          = Loc.T("settings.title");
+        TitleText.Text = Loc.T("settings.title");
+        SecIndexing.Text = Loc.T("settings.indexing");
+        UsbTitle.Text  = Loc.T("settings.usb");
+        UsbDesc.Text   = Loc.T("settings.usb.desc");
+        TrayTitle.Text = Loc.T("settings.tray");
+        TrayDesc.Text  = Loc.T("settings.tray.desc");
+        HiddenTitle.Text = Loc.T("settings.hidden");
+        HiddenDesc.Text  = Loc.T("settings.hidden.desc");
+        OkButton.Content = Loc.T("settings.ok");
+    }
+
+    private void RemovableCheckBox_Click(object sender, RoutedEventArgs e)
+    {
+        bool newValue = RemovableCheckBox.IsChecked ?? false;
+        if (newValue && !_initialRemovable)
+            StatusText.Text = Loc.T("settings.usbOn");
+        else if (!newValue && _initialRemovable)
+            StatusText.Text = Loc.T("settings.usbOff");
+        else
+            StatusText.Text = "";
+    }
+
+    private void OkButton_Click(object sender, RoutedEventArgs e)
+    {
+        bool newValue = RemovableCheckBox.IsChecked ?? false;
+        if (newValue != _initialRemovable)
+        {
+            Settings.IndexRemovableDrives = newValue;
+            Settings.Save();
+            RemovableChanged = true;
+        }
+
+        bool showHidden = HiddenSystemCheckBox.IsChecked ?? false;
+        if (showHidden != _initialShowHidden)
+        {
+            Settings.ShowHiddenSystemItems = showHidden;
+            HiddenSystemChanged = true;
+        }
+
+        Settings.MinimizeToTrayOnClose = TrayCheckBox.IsChecked ?? false;
+        Settings.Save();
+        DialogResult = true;
+        Close();
+    }
+
+    private void CloseButton_Click(object sender, RoutedEventArgs e)
+    {
+        DialogResult = false;
+        Close();
+    }
+}
