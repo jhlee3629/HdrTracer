@@ -29,6 +29,9 @@ A fast file search tool for Windows that finds files on NTFS drives by name.
 Reading the MFT and USN journal directly requires low-level access to the volume.
 Because of this, a UAC prompt appears each time the app starts.
 
+This access is used **only to read** the volume for search indexing.
+The app does not modify or delete any file without an explicit user action.
+
 ## Installation
 
 Download `HdrTracer_Setup_*.exe` from the [latest release](../../releases/latest) and run it.
@@ -56,6 +59,14 @@ settings to include them.
 - Removable drive (USB) indexing on/off
 - Close button behavior (minimize to tray / exit)
 - Show hidden/system items
+
+## Privacy & data
+
+- No network communication. File names, paths, and contents are **never sent anywhere**, and no usage/telemetry data is collected. (No internet connection or account required.)
+- Index and settings are stored **locally only**:
+  - Index cache: `%LocalAppData%\HdrTracer\indexes\`
+  - Settings: `%LocalAppData%\HdrTracer\settings.json`
+- Deleting the `HdrTracer` folder above after uninstalling removes all stored data.
 
 ## Notes
 
