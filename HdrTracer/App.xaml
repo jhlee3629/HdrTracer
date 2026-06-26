@@ -13,6 +13,7 @@
             <Setter Property="FontFamily" Value="Segoe Fluent Icons, Segoe MDL2 Assets"/>
             <Setter Property="FontSize" Value="10"/>
             <Setter Property="Cursor" Value="Arrow"/>
+            <Setter Property="FocusVisualStyle" Value="{DynamicResource AppFocusVisual}"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
@@ -243,7 +244,7 @@
                     <ControlTemplate>
                         <Rectangle Margin="2"
                                    SnapsToDevicePixels="True"
-                                   Stroke="#5E9ED6"
+                                   Stroke="#E8E8EC"
                                    StrokeThickness="1"
                                    StrokeDashArray="2 2"/>
                     </ControlTemplate>

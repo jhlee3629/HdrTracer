@@ -15,6 +15,8 @@ using Clipboard = System.Windows.Clipboard;
 using ListViewItem = System.Windows.Controls.ListViewItem;
 using MessageBox = System.Windows.MessageBox;
 using KeyEventArgs = System.Windows.Input.KeyEventArgs;
+using ContextMenu = System.Windows.Controls.ContextMenu;
+using MenuItem = System.Windows.Controls.MenuItem;
 
 namespace HdrTracer.App;
 
@@ -36,6 +38,11 @@ public partial class MainWindow : Window
     // 결과 리스트의 ContextMenu가 열려있는 동안에는 자동 재검색을 보류한다.
     // (재검색 = ItemsSource 교체 = 선택 해제 → 메뉴 클릭 시 row=null이 되는 문제 방지)
     private bool _contextMenuOpen;
+
+    // 방금 휴지통으로 보낸 경로들. 삭제 직후 도는 자동 재검색이 (USN 인덱스 갱신 지연 때문에)
+    // 이 항목들을 잠깐 되살리는 것을 막아, 우클릭 삭제도 단축키처럼 즉시·깔끔하게 사라지게 한다.
+    private readonly HashSet<string> _recentlyDeletedPaths =
+        new(StringComparer.OrdinalIgnoreCase);
 
     private enum SortColumn { Drive, Name, Path, Size, Date, Kind }
     private SortColumn _sortColumn = SortColumn.Name;
@@ -738,6 +745,22 @@ public partial class MainWindow : Window
             var sortedRows = await Task.Run(() => SortRows(rows), cts.Token);
 
             if (mySeq != _searchSequence) return;
+
+            // 방금 삭제한 항목이 인덱스 갱신 지연으로 잠깐 되살아나는 것을 막는다.
+            // 파일이 디스크에 다시 존재하면(복원 등) 추적을 풀어 정상 표시한다.
+            if (_recentlyDeletedPaths.Count > 0)
+            {
+                sortedRows = sortedRows.Where(r =>
+                {
+                    if (!_recentlyDeletedPaths.Contains(r.Path)) return true;
+                    if (System.IO.File.Exists(r.Path) || System.IO.Directory.Exists(r.Path))
+                    {
+                        _recentlyDeletedPaths.Remove(r.Path);
+                        return true;
+                    }
+                    return false;
+                }).ToList();
+            }
 
             // 갱신 전 선택을 기억 (경로 기준)
             var prevSelectedPaths = new HashSet<string>(
@@ -1613,76 +1636,37 @@ public partial class MainWindow : Window
 
     private static void RevealInExplorer(string path)
     {
-        // 1) 드라이브 루트 폴더는 선택 대상이 없으므로 그냥 열기
+        // 드라이브 루트 등 부모가 없으면 선택 대상이 없으므로 그냥 연다.
         bool isDirectory = Directory.Exists(path);
-        if (isDirectory)
+        if (isDirectory && string.IsNullOrEmpty(Path.GetDirectoryName(path)))
         {
-            var parent = Path.GetDirectoryName(path);
-            if (string.IsNullOrEmpty(parent))
-            {
-                OpenInExplorer(path);
-                return;
-            }
+            OpenInExplorer(path);
+            return;
         }
 
-        // 2) SHOpenFolderAndSelectItems는 셸 COM을 사용하므로
-        //    STA + 명시적 COM 초기화(CoInitializeEx)된 전용 스레드에서 호출해야 안정적이다.
-        //    (SetApartmentState만으로는 네이티브 셸 API의 COM 요구가 보장되지 않아
-        //     간헐적으로 선택 실패/비정상 창이 발생했음)
-        var t = new Thread(() =>
+        // explorer.exe /select 로 연다.
+        //  - 셸(explorer)이 정상 무결성 수준의 일반 창을 띄우므로, 관리자 권한으로
+        //    실행되는 이 앱에서 호출해도 제목표시줄 버튼(최소화/최대화/닫기)이 없는
+        //    비정상 창이 생기지 않는다. (SHOpenFolderAndSelectItems는 앱의 관리자 COM
+        //    컨텍스트에서 창을 만들어 그 비정상 창이 가끔 생겼다.)
+        //  - /select 인자가 해당 파일/폴더를 폴더 안에서 선택·강조하며, 셸이 창을
+        //    다 띄운 뒤 선택을 적용하므로 강조가 안정적으로 유지된다.
+        try
         {
-            bool apiSucceeded = false;
-            int hr = unchecked((int)0x80004005); // E_FAIL 초기값
-            IntPtr pidl = IntPtr.Zero;
-            // COINIT_APARTMENTTHREADED = 0x2
-            int coHr = CoInitializeEx(IntPtr.Zero, 0x2);
-            try
+            Process.Start(new ProcessStartInfo
             {
-                pidl = ILCreateFromPath(path);
-                if (pidl != IntPtr.Zero)
-                {
-                    try
-                    {
-                        hr = SHOpenFolderAndSelectItems(pidl, 0, null, 0);
-                        apiSucceeded = (hr == 0);
-
-                        // 탐색기가 폴더를 새로 열며 선택 적용을 놓치는 경합이 있어
-                        // (API는 성공을 반환해도 강조가 안 되는 경우),
-                        // 잠시 후 같은 호출을 한 번 더 해 선택을 재적용한다.
-                        // 두 번째 호출은 이미 열린 창을 재사용하므로 새 창이 뜨지 않는다.
-                        if (apiSucceeded)
-                        {
-                            Thread.Sleep(450);
-                            SHOpenFolderAndSelectItems(pidl, 0, null, 0);
-                        }
-                    }
-                    finally
-                    {
-                        ILFree(pidl);
-                    }
-                }
-            }
-            catch { apiSucceeded = false; }
-            finally
-            {
-                // CoInitializeEx가 성공(S_OK=0, S_FALSE=1)했을 때만 짝맞춰 해제
-                if (coHr == 0 || coHr == 1) CoUninitialize();
-            }
-
-            // 3) 실패 시 부모 폴더만이라도 연다 (선택 강조는 없지만 위치는 보여줌)
-            if (!apiSucceeded)
-            {
-                var dir = isDirectory ? path : Path.GetDirectoryName(path);
-                if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
-                    OpenInExplorer(dir);
-            }
-            // 성공 시: 셸 API가 알아서 창을 띄우고 포커스를 주므로
-            // 별도의 창 조작(BringExplorerToFront)을 하지 않는다.
-            // → 그 조작이 오히려 엉뚱한 탐색기 창을 건드려 비정상 창을 만들던 원인이었음.
-        });
-        t.SetApartmentState(ApartmentState.STA);
-        t.IsBackground = true;
-        t.Start();
+                FileName = "explorer.exe",
+                Arguments = $"/select,\"{path}\"",
+                UseShellExecute = false
+            });
+        }
+        catch
+        {
+            // 실패 시 부모 폴더만이라도 연다 (선택 강조는 없어도 위치는 보여줌)
+            var dir = isDirectory ? path : Path.GetDirectoryName(path);
+            if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
+                OpenInExplorer(dir);
+        }
     }
 
     private static void OpenInExplorer(string folderPath)
@@ -1916,9 +1900,27 @@ public partial class MainWindow : Window
                 MessageBox.Show(lastError, Loc.T("ctx.error"), MessageBoxButton.OK, MessageBoxImage.Error);
         }
 
-        // USN 모니터가 인덱스에서 자동 제거. 결과 갱신.
-        if (!string.IsNullOrEmpty(_lastSearchQuery) && SearchBox.Text == _lastSearchQuery)
-            RunSearch();
+        // 방금 휴지통으로 보낸 행은 USN 모니터의 비동기 인덱스 갱신을 기다리지 않고
+        // 화면 목록에서 즉시 제거한다. (삭제 직후엔 인덱스가 아직 갱신 전이라,
+        // 곧바로 RunSearch하면 옛 항목이 다시 나타나는 경합이 있었다.)
+        if (ResultsList.ItemsSource is List<SearchResultRow> shown)
+        {
+            // 인스턴스(참조)가 아니라 경로로 비교한다.
+            // 확인 대화상자 도중 자동 재검색이 결과 목록을 새 인스턴스로 교체했을 수 있어,
+            // 참조 비교로는 제거에 실패해(우클릭 경로) 항목이 늦게 사라지는 문제가 있었다.
+            var deletedPaths = new HashSet<string>(
+                rows.Where(r => !System.IO.File.Exists(r.Path)
+                             && !System.IO.Directory.Exists(r.Path))
+                    .Select(r => r.Path),
+                StringComparer.OrdinalIgnoreCase);
+            if (deletedPaths.Count > 0)
+            {
+                foreach (var p in deletedPaths) _recentlyDeletedPaths.Add(p);
+                var remaining = shown.Where(r => !deletedPaths.Contains(r.Path)).ToList();
+                ResultsList.ItemsSource = null;
+                ResultsList.ItemsSource = remaining;
+            }
+        }
     }
 
     /// <summary>간단한 한 줄 입력 다이얼로그 (WinForms 기반).</summary>

@@ -6,12 +6,12 @@
 ; ============================================================
 
 #define MyAppName "HdrTracer"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "1.0.1"
 #define MyAppPublisher "HdrTracer"
 #define MyAppExeName "HdrTracer.exe"
 
 ; 게시(publish)된 exe가 있는 폴더
-#define PublishDir "D:\VSCWorkSpace\HdrTracer_C#\HdrTracer\bin\Release\net8.0-windows\win-x64\publish"
+#define PublishDir "HdrTracer\bin\Release\net10.0-windows\win-x64\publish"
 
 ; 설치 프로그램(setup.exe)이 만들어질 폴더
 #define OutputDir "D:\VSCWorkSpace\HdrTracer_C#\Installer"
