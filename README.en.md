@@ -31,7 +31,7 @@ Because of this, a UAC prompt appears each time the app starts.
 
 ## Installation
 
-Download `HdrTracer_Setup_1.0.0.exe` from the [Releases page](../../releases/latest) and run it.
+Download `HdrTracer_Setup_*.exe` from the [latest release](../../releases/latest) and run it.
 
 The installer and executable are not code-signed, so the first time you run them
 Windows may show a "Windows protected your PC" (SmartScreen) warning.
