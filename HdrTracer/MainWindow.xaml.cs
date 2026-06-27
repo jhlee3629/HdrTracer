@@ -1830,7 +1830,6 @@ public partial class MainWindow : Window
         var rows = GetSelectedRows();
         if (rows.Count == 0) return;
 
-        // 확인 메시지: 단일이면 경로 표시, 여러 개면 개수 표시
         string confirmMsg;
         if (rows.Count == 1)
         {
@@ -1838,14 +1837,41 @@ public partial class MainWindow : Window
         }
         else
         {
-            confirmMsg = string.Format(Loc.T("ctx.delete.confirm.multi"), rows.Count);
+            // 무엇을 지우는지 분명히: 대상 파일명을 최대 10개까지 나열하고, 더 많으면 "…외 N개"
+            const int previewMax = 10;
+            var names = rows.Select(r => System.IO.Path.GetFileName(r.Path.TrimEnd('\\')))
+                            .Where(n => !string.IsNullOrEmpty(n))
+                            .Take(previewMax)
+                            .ToList();
+            string list = string.Join("\n", names);
+            if (rows.Count > previewMax)
+                list += "\n" + string.Format(Loc.T("ctx.delete.more"), rows.Count - previewMax);
+
+            confirmMsg = string.Format(Loc.T("ctx.delete.confirm.multi"), rows.Count)
+                         + "\n\n" + list;
+        }
+
+        // 위험(시스템 최상위) 경로가 섞여 있으면 강한 경고를 앞에 덧붙인다. (막지는 않음)
+        var dangerous = rows.Select(r => r.Path)
+                            .Where(IsDangerousPath)
+                            .Distinct(StringComparer.OrdinalIgnoreCase)
+                            .ToList();
+        var msgIcon = MessageBoxImage.Warning;
+        if (dangerous.Count > 0)
+        {
+            const int dangerMax = 5;
+            string dangerList = string.Join("\n", dangerous.Take(dangerMax));
+            if (dangerous.Count > dangerMax)
+                dangerList += "\n" + string.Format(Loc.T("ctx.delete.more"), dangerous.Count - dangerMax);
+
+            confirmMsg = Loc.T("ctx.delete.danger") + "\n\n" + dangerList + "\n\n" + confirmMsg;
         }
 
         var confirm = MessageBox.Show(
             confirmMsg,
             Loc.T("ctx.delete.title"),
             MessageBoxButton.OKCancel,
-            MessageBoxImage.Warning);
+            msgIcon);
 
         if (confirm != MessageBoxResult.OK) return;
 
@@ -1920,6 +1946,42 @@ public partial class MainWindow : Window
                 ResultsList.ItemsSource = null;
                 ResultsList.ItemsSource = remaining;
             }
+        }
+    }
+
+    // 시스템에 치명적인 "최상위" 경로인지 판정 (그 안의 개별 파일·폴더는 위험으로 보지 않음).
+    private static bool IsDangerousPath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return false;
+
+        // 경로 정규화: 뒤쪽 슬래시 제거, 대소문자 무시 비교용
+        string p = path.TrimEnd('\\', '/');
+
+        // 드라이브 루트 자체 (예: "C:" 또는 "C:\")
+        if (p.Length <= 2 && p.Length >= 1 && p.EndsWith(":")) return true;
+        if (p.Length == 2 && char.IsLetter(p[0]) && p[1] == ':') return true;
+
+        string win  = Environment.GetFolderPath(Environment.SpecialFolder.Windows).TrimEnd('\\');
+        string pf   = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles).TrimEnd('\\');
+        string pf86 = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86).TrimEnd('\\');
+        string users = Path.Combine(Path.GetPathRoot(win) ?? "C:\\", "Users").TrimEnd('\\');
+        string userHome = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile).TrimEnd('\\');
+
+        // Windows / Program Files: 폴더 자체와 그 하위 전체를 위험으로 본다
+        if (StartsWithDir(p, win) || StartsWithDir(p, pf) || StartsWithDir(p, pf86)) return true;
+
+        // Users 폴더 자체, 각 사용자 홈 폴더 자체는 위험. 단 그 "안"의 항목은 허용.
+        if (p.Equals(users, StringComparison.OrdinalIgnoreCase)) return true;
+        if (p.Equals(userHome, StringComparison.OrdinalIgnoreCase)) return true;
+
+        return false;
+
+        // p가 baseDir이거나 그 하위인지
+        static bool StartsWithDir(string p, string baseDir)
+        {
+            if (string.IsNullOrEmpty(baseDir)) return false;
+            if (p.Equals(baseDir, StringComparison.OrdinalIgnoreCase)) return true;
+            return p.StartsWith(baseDir + "\\", StringComparison.OrdinalIgnoreCase);
         }
     }
 
@@ -2274,6 +2336,17 @@ public partial class MainWindow : Window
         var aboutItem = new MenuItem { Header = Loc.T("menu.about") };
         aboutItem.Click += (_, _) => ShowAbout();
         menu.Items.Add(aboutItem);
+
+        menu.Items.Add(new Separator());
+
+        // 종료 (앱 완전 종료 — 트레이로 숨기지 않음)
+        var exitItem = new MenuItem { Header = Loc.T("tray.exit") };
+        exitItem.Click += (_, _) =>
+        {
+            _reallyClose = true;
+            Close();
+        };
+        menu.Items.Add(exitItem);
 
         menu.IsOpen = true;
     }

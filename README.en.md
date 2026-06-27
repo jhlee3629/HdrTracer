@@ -73,6 +73,7 @@ settings to include them.
 - NTFS only. Other file systems are not indexed.
 - No file content search. Only names and paths are searched.
 - SmartScreen warning appears because the build is not code-signed.
+- Deletion moves items to the **Recycle Bin** (recoverable), not a permanent delete. If system-critical paths are included, an extra warning is shown before deleting.
 
 ## License
 
