@@ -1059,10 +1059,17 @@ public partial class MainWindow : Window
         // 숫자/날짜 컬럼은 별도 처리 (문자열 비교 X)
         if (_sortColumn == SortColumn.Size)
         {
-            var sorted = _sortAscending
-                ? rows.AsParallel().OrderBy(r => r.SizeBytes)
-                : rows.AsParallel().OrderByDescending(r => r.SizeBytes);
-            return sorted.ToList();
+            if (rows.Count >= 50_000)
+            {
+                var sorted = _sortAscending
+                    ? rows.AsParallel().OrderBy(r => r.SizeBytes)
+                    : rows.AsParallel().OrderByDescending(r => r.SizeBytes);
+                return sorted.ToList();
+            }
+            var copy = new List<SearchResultRow>(rows);
+            if (_sortAscending) copy.Sort((a, b) => a.SizeBytes.CompareTo(b.SizeBytes));
+            else copy.Sort((a, b) => b.SizeBytes.CompareTo(a.SizeBytes));
+            return copy;
         }
         if (_sortColumn == SortColumn.Date)
         {
@@ -1761,12 +1768,8 @@ public partial class MainWindow : Window
                 string newExt = System.IO.Path.GetExtension(newName);
                 if (!string.Equals(oldExt, newExt, StringComparison.OrdinalIgnoreCase))
                 {
-                    var confirm = MessageBox.Show(
-                        Loc.T("ctx.rename.extWarn"),
-                        Loc.T("ctx.rename.title"),
-                        MessageBoxButton.OKCancel,
-                        MessageBoxImage.Warning);
-                    if (confirm != MessageBoxResult.OK) return;
+                    if (!ConfirmDialog.Show(this, Loc.T("ctx.rename.title"), Loc.T("ctx.rename.extWarn")))
+                        return;
                 }
             }
 
@@ -1856,7 +1859,7 @@ public partial class MainWindow : Window
                             .Where(IsDangerousPath)
                             .Distinct(StringComparer.OrdinalIgnoreCase)
                             .ToList();
-        var msgIcon = MessageBoxImage.Warning;
+        //var msgIcon = MessageBoxImage.Warning;
         if (dangerous.Count > 0)
         {
             const int dangerMax = 5;
@@ -1864,16 +1867,13 @@ public partial class MainWindow : Window
             if (dangerous.Count > dangerMax)
                 dangerList += "\n" + string.Format(Loc.T("ctx.delete.more"), dangerous.Count - dangerMax);
 
-            confirmMsg = Loc.T("ctx.delete.danger") + "\n\n" + dangerList + "\n\n" + confirmMsg;
+            // 단일 파일이면 위 경고 목록에 이미 경로가 있으므로 확인 문구의 경로 중복을 제거
+            string dangerQuestion = rows.Count == 1 ? Loc.T("ctx.delete.confirm") : confirmMsg;
+            confirmMsg = Loc.T("ctx.delete.danger") + "\n\n" + dangerList + "\n\n" + dangerQuestion;
         }
 
-        var confirm = MessageBox.Show(
-            confirmMsg,
-            Loc.T("ctx.delete.title"),
-            MessageBoxButton.OKCancel,
-            msgIcon);
-
-        if (confirm != MessageBoxResult.OK) return;
+        if (!ConfirmDialog.Show(this, Loc.T("ctx.delete.title"), confirmMsg))
+            return;
 
         int ok = 0, fail = 0;
         string? lastError = null;
@@ -1985,84 +1985,11 @@ public partial class MainWindow : Window
         }
     }
 
-    /// <summary>간단한 한 줄 입력 다이얼로그 (WinForms 기반).</summary>
-    /// <summary>
-    /// 간단한 한 줄 입력 다이얼로그.
-    /// selectExtension=false면 확장자 부분은 선택에서 제외 (탐색기 이름 바꾸기와 동일).
-    /// </summary>
     private static string? PromptForText(string title, string prompt, string defaultValue, bool selectExtension = true)
     {
-        var form = new System.Windows.Forms.Form
-        {
-            Text = title,
-            Width = 420,
-            Height = 170,
-            FormBorderStyle = System.Windows.Forms.FormBorderStyle.FixedDialog,
-            StartPosition = System.Windows.Forms.FormStartPosition.CenterScreen,
-            MaximizeBox = false,
-            MinimizeBox = false
-        };
-
-        var label = new System.Windows.Forms.Label
-        {
-            Text = prompt,
-            Left = 12,
-            Top = 14,
-            Width = 380
-        };
-        var textBox = new System.Windows.Forms.TextBox
-        {
-            Text = defaultValue,
-            Left = 12,
-            Top = 38,
-            Width = 380
-        };
-        var ok = new System.Windows.Forms.Button
-        {
-            Text = "OK",
-            DialogResult = System.Windows.Forms.DialogResult.OK,
-            Left = 226,
-            Top = 78,
-            Width = 80
-        };
-        var cancel = new System.Windows.Forms.Button
-        {
-            Text = "Cancel",
-            DialogResult = System.Windows.Forms.DialogResult.Cancel,
-            Left = 312,
-            Top = 78,
-            Width = 80
-        };
-
-        form.Controls.Add(label);
-        form.Controls.Add(textBox);
-        form.Controls.Add(ok);
-        form.Controls.Add(cancel);
-        form.AcceptButton = ok;
-        form.CancelButton = cancel;
-
-        if (selectExtension)
-        {
-            textBox.SelectAll();
-        }
-        else
-        {
-            // 탐색기와 동일: 이름 부분만 선택, 확장자(마지막 점 이후)는 선택 제외
-            int dot = defaultValue.LastIndexOf('.');
-            if (dot > 0)
-            {
-                textBox.Select(0, dot);
-            }
-            else
-            {
-                textBox.SelectAll();
-            }
-        }
-        textBox.Focus();
-
-        return form.ShowDialog() == System.Windows.Forms.DialogResult.OK
-            ? textBox.Text.Trim()
-            : null;
+        return InputDialog.Show(
+            System.Windows.Application.Current?.MainWindow,
+            title, prompt, defaultValue, selectAll: selectExtension);
     }
 
     // Windows 표준 "속성" 대화상자를 띄우려면 ShellExecuteEx에 "properties" verb를 줘야 함
@@ -2399,13 +2326,8 @@ public partial class MainWindow : Window
 
     private async Task RebuildIndex()
     {
-        var result = MessageBox.Show(
-            Loc.T("refresh.confirm.msg"),
-            Loc.T("refresh.confirm.title"),
-            MessageBoxButton.OKCancel,
-            MessageBoxImage.Question);
-
-        if (result != MessageBoxResult.OK) return;
+        if (!ConfirmDialog.Show(this, Loc.T("refresh.confirm.title"), Loc.T("refresh.confirm.msg")))
+            return;
 
         try
         {

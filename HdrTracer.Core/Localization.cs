@@ -160,6 +160,8 @@ public static class Localization
 
         // 공통
         ["common.error"] = "오류",
+        ["common.ok"]     = "확인",
+        ["common.cancel"] = "취소",
     };
 
     private static readonly Dictionary<string, string> _en = new()
@@ -294,5 +296,7 @@ public static class Localization
 
         // Common
         ["common.error"] = "Error",
+        ["common.ok"]     = "OK",
+        ["common.cancel"] = "Cancel",
     };
 }
