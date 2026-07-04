@@ -80,6 +80,8 @@ public partial class MainWindow : Window
         // 저장된 컬럼 너비 복원
         ApplySavedColumnWidths();
 
+        RestoreWindowPlacement();
+
         _debounceTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
         _debounceTimer.Tick += DebounceTimer_Tick;
 
@@ -853,6 +855,18 @@ public partial class MainWindow : Window
         }
     }
 
+    // 결과 리스트의 세로 스크롤바 유무에 맞춰 헤더 오른쪽 여백(16px) 컬럼을 동적으로 조정.
+    // 스크롤바가 없을 때 크기/날짜 데이터가 헤더와 어긋나는 문제 방지.
+    private void ResultsList_ScrollChanged(object sender, ScrollChangedEventArgs e)
+    {
+        if (e.OriginalSource is not ScrollViewer sv) return;
+
+        double w = sv.ComputedVerticalScrollBarVisibility == Visibility.Visible ? 16 : 0;
+        var lastCol = HeaderGrid.ColumnDefinitions[^1];
+        if (lastCol.Width.Value != w)
+            lastCol.Width = new GridLength(w);
+    }
+
     // 컬럼 경계 드래그 → 경계 양쪽 컬럼을 함께 조절 (고전적 분할선 동작).
     // 경계를 끌면 왼쪽 칸은 커지고 오른쪽 칸은 그만큼 줄어, 경계선만 움직이고
     // 나머지 컬럼은 그대로 유지된다. (경로는 * 채움이라 자동으로 흡수)
@@ -925,6 +939,63 @@ public partial class MainWindow : Window
         if (_settings.ColWidthName  >= MinWidthOf("ColName"))  Cols.SetName(_settings.ColWidthName);
         if (_settings.ColWidthSize  >= MinWidthOf("ColSize"))  Cols.SetSize(_settings.ColWidthSize);
         if (_settings.ColWidthDate  >= MinWidthOf("ColDate"))  Cols.SetDate(_settings.ColWidthDate);
+    }
+
+    // 저장된 창 위치·크기·최대화 상태 복원.
+    // 원칙: 저장값을 그대로 믿지 않고, "현재 연결된 모니터 중 하나에 타이틀바가
+    // 충분히 보이는지" 검증한다. 유효하면 그대로(두 번째 모니터·걸친 배치 존중),
+    // 아니면(모니터 분리·해상도 변경 등) 위치만 버리고 기본(화면 중앙)으로 시작한다.
+    private void RestoreWindowPlacement()
+    {
+        var s = _settings;
+        if (s.WinWidth < 100 || s.WinHeight < 100) return;   // 저장값 없음/비정상 → 기본 크기·중앙
+
+        // 크기는 항상 복원 (최소 크기 미만이면 최소로 보정)
+        Width  = Math.Max(MinWidth,  s.WinWidth);
+        Height = Math.Max(MinHeight, s.WinHeight);
+
+        // DIP(WPF 단위) → 물리 픽셀 변환 배율 (주 모니터 기준 근사)
+        double sx = 1.0, sy = 1.0;
+        try
+        {
+            var ps = System.Windows.Forms.Screen.PrimaryScreen;
+            if (ps is not null && SystemParameters.PrimaryScreenWidth > 0)
+            {
+                sx = ps.Bounds.Width  / SystemParameters.PrimaryScreenWidth;
+                sy = ps.Bounds.Height / SystemParameters.PrimaryScreenHeight;
+            }
+        }
+        catch { }
+
+        // 타이틀바 영역(창 상단 30 DIP)을 픽셀 사각형으로
+        var titleRect = new System.Drawing.Rectangle(
+            (int)(s.WinLeft * sx), (int)(s.WinTop * sy),
+            (int)(Width * sx), (int)(30 * sy));
+
+        // 연결된 모든 모니터의 작업 영역과 교차 검사:
+        // 타이틀바가 가로 50px·세로 10px 이상 보이면 "잡을 수 있는 위치"로 판정
+        bool visible = false;
+        try
+        {
+            foreach (var scr in System.Windows.Forms.Screen.AllScreens)
+            {
+                var inter = System.Drawing.Rectangle.Intersect(scr.WorkingArea, titleRect);
+                if (inter.Width >= 50 && inter.Height >= 10) { visible = true; break; }
+            }
+        }
+        catch { }
+
+        if (visible)
+        {
+            WindowStartupLocation = WindowStartupLocation.Manual;
+            Left = s.WinLeft;
+            Top  = s.WinTop;
+        }
+        // visible == false → 위치는 버리고 XAML의 CenterScreen 유지 (크기만 복원)
+
+        // 최대화는 위치를 정한 뒤에: 창 좌표가 속한 모니터에서 최대화된다
+        if (s.WinMaximized)
+            WindowState = WindowState.Maximized;
     }
 
     // 메뉴: 컬럼 너비 초기화 → 디자인 기본값으로 되돌리고 저장
@@ -1833,18 +1904,32 @@ public partial class MainWindow : Window
         var rows = GetSelectedRows();
         if (rows.Count == 0) return;
 
+        // 너무 긴 이름/경로는 가운데를 줄여 한 줄로 (다이얼로그 줄바꿈 난립 방지)
+        static string Shorten(string s, int max = 60)
+            => s.Length <= max ? s : s[..(max / 2 - 1)] + "…" + s[^(max / 2 - 1)..];
+
+        var dangerous = rows.Select(r => r.Path)
+                            .Where(IsDangerousPath)
+                            .Distinct(StringComparer.OrdinalIgnoreCase)
+                            .ToList();
+
         string confirmMsg;
         if (rows.Count == 1)
         {
-            confirmMsg = $"{Loc.T("ctx.delete.confirm")}\n\n{rows[0].Path}";
+            confirmMsg = $"{Loc.T("ctx.delete.confirm")}\n\n{Shorten(rows[0].Path, 90)}";
         }
         else
         {
-            // 무엇을 지우는지 분명히: 대상 파일명을 최대 10개까지 나열하고, 더 많으면 "…외 N개"
+            // 목록은 하나만: 파일명 최대 10개, 위험 항목은 ⚠ 로 표시
             const int previewMax = 10;
-            var names = rows.Select(r => System.IO.Path.GetFileName(r.Path.TrimEnd('\\')))
-                            .Where(n => !string.IsNullOrEmpty(n))
-                            .Take(previewMax)
+            var names = rows.Take(previewMax)
+                            .Select(r =>
+                            {
+                                string n = System.IO.Path.GetFileName(r.Path.TrimEnd('\\'));
+                                if (string.IsNullOrEmpty(n)) n = r.Path;
+                                n = Shorten(n);
+                                return IsDangerousPath(r.Path) ? "⚠ " + n : n;
+                            })
                             .ToList();
             string list = string.Join("\n", names);
             if (rows.Count > previewMax)
@@ -1854,23 +1939,9 @@ public partial class MainWindow : Window
                          + "\n\n" + list;
         }
 
-        // 위험(시스템 최상위) 경로가 섞여 있으면 강한 경고를 앞에 덧붙인다. (막지는 않음)
-        var dangerous = rows.Select(r => r.Path)
-                            .Where(IsDangerousPath)
-                            .Distinct(StringComparer.OrdinalIgnoreCase)
-                            .ToList();
-        //var msgIcon = MessageBoxImage.Warning;
+        // 위험 항목이 있으면 경고 문구를 맨 위에 한 줄만 (경로 목록 중복 제거)
         if (dangerous.Count > 0)
-        {
-            const int dangerMax = 5;
-            string dangerList = string.Join("\n", dangerous.Take(dangerMax));
-            if (dangerous.Count > dangerMax)
-                dangerList += "\n" + string.Format(Loc.T("ctx.delete.more"), dangerous.Count - dangerMax);
-
-            // 단일 파일이면 위 경고 목록에 이미 경로가 있으므로 확인 문구의 경로 중복을 제거
-            string dangerQuestion = rows.Count == 1 ? Loc.T("ctx.delete.confirm") : confirmMsg;
-            confirmMsg = Loc.T("ctx.delete.danger") + "\n\n" + dangerList + "\n\n" + dangerQuestion;
-        }
+            confirmMsg = Loc.T("ctx.delete.danger") + "\n\n" + confirmMsg;
 
         if (!ConfirmDialog.Show(this, Loc.T("ctx.delete.title"), confirmMsg))
             return;
@@ -2083,7 +2154,27 @@ public partial class MainWindow : Window
         {
             e.Cancel = true;
             _trayIcon.HideWindow();
+            return;
         }
+
+        // 진짜 종료 확정: 창 위치·크기·최대화 상태 저장.
+        // (Closed에서는 RestoreBounds가 Empty가 되어 최대화 상태 저장이 안 됨 → 반드시 여기서)
+        try
+        {
+            var b = WindowState == WindowState.Normal
+                ? new Rect(Left, Top, ActualWidth, ActualHeight)
+                : RestoreBounds;
+            if (b.Width >= 100 && b.Height >= 100)
+            {
+                _settings.WinLeft = b.Left;
+                _settings.WinTop = b.Top;
+                _settings.WinWidth = b.Width;
+                _settings.WinHeight = b.Height;
+                _settings.WinMaximized = WindowState == WindowState.Maximized;
+                _settings.Save();
+            }
+        }
+        catch { /* 저장 실패해도 종료는 계속 */ }
     }
 
     // ==================================================

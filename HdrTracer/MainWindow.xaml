@@ -4,6 +4,7 @@
         x:Name="RootWindow"
         Title="HdrTracer"
         Height="600" Width="900"
+        MinHeight="350" MinWidth="600"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None"
         ResizeMode="CanResize"
@@ -467,7 +468,8 @@
                             MouseDoubleClick="ResultsList_MouseDoubleClick"
                             PreviewMouseLeftButtonDown="ResultsList_PreviewMouseLeftButtonDown"
                             ContextMenuOpening="ResultsList_ContextMenuOpening"
-                            PreviewKeyDown="ResultsList_KeyDown">
+                            PreviewKeyDown="ResultsList_KeyDown"
+                            ScrollViewer.ScrollChanged="ResultsList_ScrollChanged">
                         <ListView.InputBindings>
                             <KeyBinding Key="Enter" Command="ApplicationCommands.Open"/>
                             <KeyBinding Modifiers="Alt" Key="Enter" Command="ApplicationCommands.Properties"/>

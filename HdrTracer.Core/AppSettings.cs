@@ -26,6 +26,13 @@ public sealed class AppSettings
     public double ColWidthName  { get; set; } = 280;
     public double ColWidthSize  { get; set; } = 80;
     public double ColWidthDate  { get; set; } = 120;
+    
+    /// <summary>창 위치·크기·최대화 상태. Width/Height가 100 미만이면 "저장 안 됨"으로 간주.</summary>
+    public double WinLeft   { get; set; } = 0;
+    public double WinTop    { get; set; } = 0;
+    public double WinWidth  { get; set; } = 0;
+    public double WinHeight { get; set; } = 0;
+    public bool   WinMaximized { get; set; } = false;
 
     private static string GetSettingsPath()
     {
