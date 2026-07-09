@@ -13,10 +13,11 @@ namespace HdrTracer.App;
 /// </summary>
 public sealed class ColumnWidths : INotifyPropertyChanged
 {
-    private GridLength _drive = new(50);
-    private GridLength _name  = new(280);
-    private GridLength _size  = new(80);
-    private GridLength _date  = new(120);
+    private GridLength _drive = new(50,  GridUnitType.Star);
+    private GridLength _name  = new(280, GridUnitType.Star);
+    private GridLength _path  = new(300, GridUnitType.Star);
+    private GridLength _size  = new(80,  GridUnitType.Star);
+    private GridLength _date  = new(120, GridUnitType.Star);
 
     public GridLength Drive
     {
@@ -38,17 +39,24 @@ public sealed class ColumnWidths : INotifyPropertyChanged
         get => _date;
         set { if (_date != value) { _date = value; OnChanged(nameof(Date)); } }
     }
+    public GridLength Path
+    {
+        get => _path;
+        set { if (_path != value) { _path = value; OnChanged(nameof(Path)); } }
+    }
 
     // 픽셀 값 편의 접근자 (드래그 로직에서 숫자로 다루기 쉽게)
     public double DrivePx => _drive.Value;
     public double NamePx  => _name.Value;
     public double SizePx  => _size.Value;
     public double DatePx  => _date.Value;
+    public double PathPx  => _path.Value;
 
-    public void SetDrive(double px) => Drive = new GridLength(px, GridUnitType.Pixel);
-    public void SetName(double px)  => Name  = new GridLength(px, GridUnitType.Pixel);
-    public void SetSize(double px)  => Size  = new GridLength(px, GridUnitType.Pixel);
-    public void SetDate(double px)  => Date  = new GridLength(px, GridUnitType.Pixel);
+    public void SetDrive(double px) => Drive = new GridLength(px, GridUnitType.Star);
+    public void SetName(double px)  => Name  = new GridLength(px, GridUnitType.Star);
+    public void SetPath(double px)  => Path  = new GridLength(px, GridUnitType.Star);
+    public void SetSize(double px)  => Size  = new GridLength(px, GridUnitType.Star);
+    public void SetDate(double px)  => Date  = new GridLength(px, GridUnitType.Star);
 
     public event PropertyChangedEventHandler? PropertyChanged;
     private void OnChanged(string name)

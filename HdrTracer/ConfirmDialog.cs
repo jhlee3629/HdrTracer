@@ -300,3 +300,125 @@ internal static class InputDialog
         return win.ShowDialog() == true ? tb.Text.Trim() : null;
     }
 }
+
+/// <summary>확인 버튼 하나짜리 정보 대화상자. "#제목" / "예시|설명" 형식을 2열로 정렬해 그린다.</summary>
+internal static class InfoDialog
+{
+    public static void Show(System.Windows.Window? owner, string title, string message)
+    {
+        var win = DialogTheme.NewWindow(owner);
+        win.MaxWidth = 620;
+
+        var body = new System.Windows.Controls.Grid { Margin = new System.Windows.Thickness(20) };
+        body.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = System.Windows.GridLength.Auto });
+        body.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = new System.Windows.GridLength(16) });
+        body.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = System.Windows.GridLength.Auto });
+
+        var stack = new System.Windows.Controls.StackPanel();
+        System.Windows.Controls.Grid.SetRow(stack, 0);
+
+        // 예시|설명 2열 정렬용 공유 그리드
+        var table = new System.Windows.Controls.Grid();
+        table.ColumnDefinitions.Add(new System.Windows.Controls.ColumnDefinition { Width = System.Windows.GridLength.Auto });
+        table.ColumnDefinitions.Add(new System.Windows.Controls.ColumnDefinition { Width = new System.Windows.GridLength(1, System.Windows.GridUnitType.Star) });
+        int rowIdx = 0;
+
+        void FlushTable()
+        {
+            if (rowIdx == 0) return;
+            stack.Children.Add(table);
+            table = new System.Windows.Controls.Grid();
+            table.ColumnDefinitions.Add(new System.Windows.Controls.ColumnDefinition { Width = System.Windows.GridLength.Auto });
+            table.ColumnDefinitions.Add(new System.Windows.Controls.ColumnDefinition { Width = new System.Windows.GridLength(1, System.Windows.GridUnitType.Star) });
+            rowIdx = 0;
+        }
+
+        foreach (var rawLine in message.Split('\n'))
+        {
+            string line = rawLine.TrimEnd('\r');
+
+            if (line.Length == 0)                       // 빈 줄 = 섹션 간격
+            {
+                FlushTable();
+                stack.Children.Add(new System.Windows.Controls.Border { Height = 12 });
+                continue;
+            }
+
+            if (line.StartsWith("#"))                   // 섹션 제목
+            {
+                FlushTable();
+                stack.Children.Add(new System.Windows.Controls.TextBlock
+                {
+                    Text = line.Substring(1),
+                    Foreground = DialogTheme.TextFg,
+                    FontSize = 13,
+                    FontWeight = System.Windows.FontWeights.Bold,
+                    Margin = new System.Windows.Thickness(0, 0, 0, 6)
+                });
+                continue;
+            }
+
+            int bar = line.IndexOf('|');
+            if (bar > 0)                                 // 예시 | 설명 (2열)
+            {
+                table.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = System.Windows.GridLength.Auto });
+
+                var ex = new System.Windows.Controls.TextBlock
+                {
+                    Text = line.Substring(0, bar),
+                    Foreground = System.Windows.Media.Brushes.White,
+                    FontFamily = new System.Windows.Media.FontFamily("Consolas"),
+                    FontSize = 13,
+                    Background = DialogTheme.InputBg,
+                    Padding = new System.Windows.Thickness(6, 2, 6, 2),
+                    Margin = new System.Windows.Thickness(0, 0, 12, 5),
+                    VerticalAlignment = System.Windows.VerticalAlignment.Top
+                };
+                System.Windows.Controls.Grid.SetRow(ex, rowIdx);
+                System.Windows.Controls.Grid.SetColumn(ex, 0);
+                table.Children.Add(ex);
+
+                var desc = new System.Windows.Controls.TextBlock
+                {
+                    Text = line.Substring(bar + 1),
+                    Foreground = DialogTheme.TextFg,
+                    FontSize = 13,
+                    TextWrapping = System.Windows.TextWrapping.Wrap,
+                    Margin = new System.Windows.Thickness(0, 2, 0, 5),
+                    VerticalAlignment = System.Windows.VerticalAlignment.Top
+                };
+                System.Windows.Controls.Grid.SetRow(desc, rowIdx);
+                System.Windows.Controls.Grid.SetColumn(desc, 1);
+                table.Children.Add(desc);
+
+                rowIdx++;
+                continue;
+            }
+
+            // 일반 문장
+            FlushTable();
+            stack.Children.Add(new System.Windows.Controls.TextBlock
+            {
+                Text = line,
+                Foreground = DialogTheme.TextFg,
+                FontSize = 12.5,
+                TextWrapping = System.Windows.TextWrapping.Wrap,
+                Margin = new System.Windows.Thickness(0, 1, 0, 1)
+            });
+        }
+        FlushTable();
+
+        body.Children.Add(stack);
+
+        var okBtn = DialogTheme.MakeButton(Loc.T("common.ok"));
+        okBtn.IsDefault = true;
+        okBtn.IsCancel = true;
+        okBtn.HorizontalAlignment = System.Windows.HorizontalAlignment.Right;
+        okBtn.Click += (_, _) => win.DialogResult = true;
+        System.Windows.Controls.Grid.SetRow(okBtn, 2);
+        body.Children.Add(okBtn);
+
+        DialogTheme.Compose(win, title, body);
+        win.ShowDialog();
+    }
+}

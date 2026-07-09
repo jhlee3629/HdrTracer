@@ -56,6 +56,9 @@ public partial class MainWindow : Window
     private TrayIconHelper? _trayIcon;
     private bool _reallyClose;
 
+    private System.Windows.Point _dragStart;
+    private bool _dragArmed;
+
     private GlobalHotkey? _globalHotkey;
 
     private const double ZoomMin = 0.5;
@@ -72,6 +75,11 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+
+        // 창 이동/크기조절 시 히스토리 팝업이 검색창을 따라오도록 재배치
+        LocationChanged += (_, _) => RepositionHistoryPopup();
+        SizeChanged     += (_, _) => RepositionHistoryPopup();
+
         StateChanged += MainWindow_StateChanged;
 
         // 저장된 설정을 검색 엔진에 반영 (기본 false → 숨김+시스템 항목 숨김)
@@ -541,6 +549,9 @@ public partial class MainWindow : Window
     // ==================================================
     private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
     {
+        if (SearchPlaceholder != null)
+            SearchPlaceholder.Visibility = string.IsNullOrEmpty(SearchBox.Text) ? Visibility.Visible : Visibility.Collapsed;
+
         // 입력이 시작되면 히스토리 팝업은 닫는다
         if (!string.IsNullOrEmpty(SearchBox.Text) && HistoryPopup.IsOpen)
             HistoryPopup.IsOpen = false;
@@ -587,6 +598,32 @@ public partial class MainWindow : Window
         RunSearch();
     }
 
+    // 크기/날짜 조건 토큰을 검색창에 넣는다. 같은 종류의 기존 조건은 교체, token이 null이면 제거만.
+    // (조건 토큰 구분: '>' 또는 '<'로 시작하고, 끝이 B/KB/MB/GB/TB면 크기, 아니면 날짜)
+    private void ApplyAttrFilter(bool isSize, string? token)
+    {
+        var kept = SplitQueryTokens(SearchBox.Text)
+            .Where(t =>
+            {
+                if (t.Length < 2 || (t[0] != '>' && t[0] != '<')) return true;  // 조건 토큰 아님 → 유지
+                bool tokenIsSize = char.ToUpperInvariant(t[^1]) == 'B';
+                return tokenIsSize != isSize;                                    // 같은 종류만 제거
+            })
+            .ToList();
+
+        // SplitQueryTokens가 따옴표를 벗기므로, 공백 포함 토큰(경로)은 따옴표 복원
+        for (int i = 0; i < kept.Count; i++)
+            if (kept[i].Contains(' ')) kept[i] = "\"" + kept[i] + "\"";
+
+        if (token != null) kept.Add(token);
+
+        SearchBox.Text = string.Join(" ", kept);
+        SearchBox.CaretIndex = SearchBox.Text.Length;
+        SearchBox.Focus();
+        HistoryPopup.IsOpen = false;
+        RunSearch();
+    }
+
     // ===== 검색 히스토리 =====
     private const int MaxHistory = 10;
 
@@ -629,6 +666,15 @@ public partial class MainWindow : Window
         HistoryList.ItemsSource = null;
         HistoryList.ItemsSource = h.ToList();
         HistoryPopup.IsOpen = true;
+    }
+
+    // WPF Popup은 창 이동을 자동으로 따라오지 않음 → 오프셋을 살짝 바꿨다 되돌려 위치 재계산 유도
+    private void RepositionHistoryPopup()
+    {
+        if (!HistoryPopup.IsOpen) return;
+        double o = HistoryPopup.HorizontalOffset;
+        HistoryPopup.HorizontalOffset = o + 0.1;
+        HistoryPopup.HorizontalOffset = o;
     }
 
     private void SearchButton_Click(object sender, RoutedEventArgs e)
@@ -701,6 +747,7 @@ public partial class MainWindow : Window
         if (string.IsNullOrWhiteSpace(query) || indexes.Count == 0)
         {
             ResultsList.ItemsSource = null;
+            EmptyHint.Visibility = Visibility.Collapsed;
             UpdateFooterSummary();
             return;
         }
@@ -772,6 +819,7 @@ public partial class MainWindow : Window
             // 4) UI 즉시 표시
             sw.Stop();
             ResultsList.ItemsSource = sortedRows;
+            EmptyHint.Visibility = sortedRows.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
             _lastSearchQuery = query;
 
             // 이전 선택 복원: 새 결과 중에서 같은 경로를 가진 행을 다시 선택
@@ -881,6 +929,7 @@ public partial class MainWindow : Window
     {
         "ColDrive" => 40,
         "ColName"  => 80,
+        "ColPath"  => PathMinWidth,
         "ColSize"  => 60,
         "ColDate"  => 80,
         _          => 30,
@@ -903,18 +952,26 @@ public partial class MainWindow : Window
         _lastDragMouseX = mouseX;
         if (d == 0) return;
 
-        // 표준 분할선 규칙: 경계를 오른쪽으로 끌면 왼쪽 칸이 커지고 오른쪽 칸이 작아진다.
-        //   DRV|이름     : DRV ↑, 이름 ↓   (둘 다 픽셀 → 합 보존)
-        //   이름|경로    : 이름 ↑, 경로 ↓  (경로는 * 자동 흡수)
-        //   경로|크기    : 경로 ↑, 크기 ↓  (경로는 * 자동 흡수)
-        //   크기|수정날짜 : 크기 ↑, 수정날짜 ↓ (둘 다 픽셀 → 합 보존)
+        NormalizeColumnWeights();
+
         switch (tag)
         {
-            case "ColDrive":   AdjustTwoPixel("ColDrive", "ColName", d); break; // DRV | 이름
-            case "ColName":    AdjustColumnAbsorbedByPath("ColName", +d); break; // 이름 | 경로: 이름 +d, 경로 흡수
-            case "ColSizeLeft":AdjustColumnAbsorbedByPath("ColSize", -d); break; // 경로 | 크기: 크기 -d, 경로 흡수
-            case "ColSize":    AdjustTwoPixel("ColSize", "ColDate", d); break; // 크기 | 수정날짜
+            case "ColDrive":   AdjustTwoPixel("ColDrive", "ColName", d); break; 
+            case "ColName":    AdjustTwoPixel("ColName", "ColPath", d); break; 
+            case "ColSizeLeft":AdjustTwoPixel("ColPath", "ColSize", d); break; 
+            case "ColSize":    AdjustTwoPixel("ColSize", "ColDate", d); break; 
         }
+    }
+
+    // 별(*) 가중치를 현재 실제 렌더 픽셀로 재설정(화면 변화 없음).
+    // 창 크기 변경 후 드래그할 때 무관한 컬럼이 출렁이는 것을 방지.
+    private void NormalizeColumnWeights()
+    {
+        Cols.SetDrive(HeaderActualWidth(0));
+        Cols.SetName(HeaderActualWidth(1));
+        Cols.SetPath(HeaderActualWidth(2));
+        Cols.SetSize(HeaderActualWidth(3));
+        Cols.SetDate(HeaderActualWidth(4));
     }
 
     private void ColumnSplitter_DragCompleted(object sender, System.Windows.Controls.Primitives.DragCompletedEventArgs e)
@@ -927,18 +984,31 @@ public partial class MainWindow : Window
     {
         _settings.ColWidthDrive = HeaderActualWidth(0);
         _settings.ColWidthName  = HeaderActualWidth(1);
+        _settings.ColWidthPath  = HeaderActualWidth(2);
         _settings.ColWidthSize  = HeaderActualWidth(3);
         _settings.ColWidthDate  = HeaderActualWidth(4);
         _settings.Save();
     }
 
-    // 시작 시: 저장된 컬럼 너비를 Cols에 적용 (각 컬럼 최소 미만이면 기본값 유지 → 비정상값 방어)
+    // 시작 시: 저장된 컬럼 너비를 Cols에 적용.
+    // 다섯 값이 모두 정상일 때만 "한 세트"로 적용한다 — 일부만 적용하면
+    // 옛 저장값과 기본값이 섞여 비율(별 가중치)이 틀어지기 때문.
     private void ApplySavedColumnWidths()
     {
-        if (_settings.ColWidthDrive >= MinWidthOf("ColDrive")) Cols.SetDrive(_settings.ColWidthDrive);
-        if (_settings.ColWidthName  >= MinWidthOf("ColName"))  Cols.SetName(_settings.ColWidthName);
-        if (_settings.ColWidthSize  >= MinWidthOf("ColSize"))  Cols.SetSize(_settings.ColWidthSize);
-        if (_settings.ColWidthDate  >= MinWidthOf("ColDate"))  Cols.SetDate(_settings.ColWidthDate);
+        bool allValid =
+            _settings.ColWidthDrive >= MinWidthOf("ColDrive") &&
+            _settings.ColWidthName  >= MinWidthOf("ColName")  &&
+            _settings.ColWidthPath  >= MinWidthOf("ColPath")  &&
+            _settings.ColWidthSize  >= MinWidthOf("ColSize")  &&
+            _settings.ColWidthDate  >= MinWidthOf("ColDate");
+
+        if (!allValid) return;   // 하나라도 없거나 비정상 → 전부 기본 비율로 시작
+
+        Cols.SetDrive(_settings.ColWidthDrive);
+        Cols.SetName(_settings.ColWidthName);
+        Cols.SetPath(_settings.ColWidthPath);
+        Cols.SetSize(_settings.ColWidthSize);
+        Cols.SetDate(_settings.ColWidthDate);
     }
 
     // 저장된 창 위치·크기·최대화 상태 복원.
@@ -1003,11 +1073,13 @@ public partial class MainWindow : Window
     {
         Cols.SetDrive(50);
         Cols.SetName(280);
+        Cols.SetPath(300);
         Cols.SetSize(80);
         Cols.SetDate(120);
 
         _settings.ColWidthDrive = 50;
         _settings.ColWidthName  = 280;
+        _settings.ColWidthPath  = 300;
         _settings.ColWidthSize  = 80;
         _settings.ColWidthDate  = 120;
         _settings.Save();
@@ -1020,13 +1092,13 @@ public partial class MainWindow : Window
             return HeaderGrid.ColumnDefinitions[index].ActualWidth;
         return 0;
     }
-    private double PathActualWidth() => HeaderActualWidth(2); // 경로(*)의 현재 렌더 폭
 
     // group → Cols의 현재 픽셀값 읽기 / 쓰기
     private double ColPx(string group) => group switch
     {
         "ColDrive" => Cols.DrivePx,
         "ColName"  => Cols.NamePx,
+        "ColPath"  => Cols.PathPx,
         "ColSize"  => Cols.SizePx,
         "ColDate"  => Cols.DatePx,
         _ => 0,
@@ -1037,6 +1109,7 @@ public partial class MainWindow : Window
         {
             case "ColDrive": Cols.SetDrive(px); break;
             case "ColName":  Cols.SetName(px);  break;
+            case "ColPath":  Cols.SetPath(px); break;
             case "ColSize":  Cols.SetSize(px);  break;
             case "ColDate":  Cols.SetDate(px);  break;
         }
@@ -1046,6 +1119,7 @@ public partial class MainWindow : Window
     {
         "ColDrive" => 0,
         "ColName"  => 1,
+        "ColPath"  => 2,
         "ColSize"  => 3,
         "ColDate"  => 4,
         _ => -1,
@@ -1074,28 +1148,6 @@ public partial class MainWindow : Window
 
         SetCol(leftGroup,  lw + delta);
         SetCol(rightGroup, rw - delta);
-    }
-
-    // 한쪽이 경로(*)인 경계: 픽셀 컬럼 하나(group)만 change만큼 바꾸고 경로가 흡수.
-    //  change>0: 컬럼 커짐 → 경로 줄어듦(경로 최소 60에서 멈춤)
-    //  change<0: 컬럼 작아짐 → 경로 늘어남(컬럼 최소에서 멈춤)
-    // 경로는 * 그대로 두므로(Cols에 없음) 헤더·행 모두 자동으로 같은 폭이 된다.
-    private void AdjustColumnAbsorbedByPath(string group, double change)
-    {
-        double cMin = MinWidthOf(group);
-        double cw = ColActual(group);
-        double pw = PathActualWidth();
-        double want = change;
-
-        if (cw + change < cMin) change = cMin - cw;
-        if (change > 0 && pw - change < PathMinWidth) change = pw - PathMinWidth;
-
-        const double eps = 0.5;
-        if (want > 0 && change <= eps) return;
-        if (want < 0 && change >= -eps) return;
-
-        SetCol(group, cw + change);
-        // 경로(*)는 자동으로 (pw - change)가 됨.
     }
 
     /// <summary>
@@ -1333,7 +1385,44 @@ public partial class MainWindow : Window
         if (IsClickOnEmptySpace(e))
         {
             ResultsList.UnselectAll();
+            _dragArmed = false;
         }
+        else
+        {
+            // 항목 위에서 눌렀으면 드래그 시작 후보로 기록
+            _dragStart = e.GetPosition(null);
+            _dragArmed = true;
+        }
+    }
+
+    // 선택한 파일/폴더를 탐색기 등 외부로 끌어다 놓기 (FileDrop).
+    // 주의: 이 앱은 관리자 권한이라, 일반 권한 탐색기로의 드롭은 Windows(UIPI)가 막을 수 있음.
+    private void ResultsList_MouseMove(object sender, System.Windows.Input.MouseEventArgs e)
+    {
+        if (!_dragArmed || e.LeftButton != MouseButtonState.Pressed) return;
+
+        var pos = e.GetPosition(null);
+        if (Math.Abs(pos.X - _dragStart.X) < SystemParameters.MinimumHorizontalDragDistance &&
+            Math.Abs(pos.Y - _dragStart.Y) < SystemParameters.MinimumVerticalDragDistance)
+            return;   // 아직 클릭 수준의 움직임 → 드래그 아님
+
+        _dragArmed = false;
+
+        var rows = GetSelectedRows();
+        if (rows.Count == 0) return;
+
+        var paths = rows.Select(r => r.Path)
+                        .Where(p => System.IO.File.Exists(p) || System.IO.Directory.Exists(p))
+                        .ToArray();
+        if (paths.Length == 0) return;
+
+        var data = new System.Windows.DataObject(System.Windows.DataFormats.FileDrop, paths);
+        try
+        {
+            System.Windows.DragDrop.DoDragDrop(ResultsList, data,
+                System.Windows.DragDropEffects.Copy | System.Windows.DragDropEffects.Move);
+        }
+        catch { /* 드래그 취소 등은 무시 */ }
     }
 
     // 빈 공간에서 컨텍스트 메뉴 열리는 것을 막는다 (탐색기와 동일한 동작)
@@ -1758,6 +1847,113 @@ public partial class MainWindow : Window
             });
         }
         catch { /* 실패해도 앱은 계속 */ }
+    }
+
+    // 선택 항목의 폴더를 경로 필터로 검색창에 넣고 재검색.
+    // 파일이면 부모 폴더, 폴더면 그 폴더 자체. 공백 포함 경로는 따옴표로 묶는다.
+    private void MenuSearchInFolder_Click(object sender, RoutedEventArgs e)
+    {
+        var rows = GetSelectedRows();
+        if (rows.Count == 0) return;
+        var row = rows[0];
+
+        string folder;
+        try
+        {
+            folder = System.IO.Directory.Exists(row.Path)
+                ? row.Path
+                : (System.IO.Path.GetDirectoryName(row.Path) ?? row.Path);
+        }
+        catch { return; }
+
+        folder = folder.TrimEnd('\\') + "\\";
+        string filter = folder.Contains(' ') ? "\"" + folder + "\"" : folder;
+
+        // 기존 검색어에서 이전 경로 필터를 제거하고 새 필터로 교체
+        var kept = new List<string>();
+        foreach (var t in SplitQueryTokens(SearchBox.Text))
+            if (!t.Contains('\\') && !t.Contains('/')) kept.Add(t);
+        kept.Add(filter);
+
+        SearchBox.Text = string.Join(" ", kept);
+        RunSearch();
+    }
+
+    // 검색창 텍스트를 따옴표 인식하며 토큰으로 분리 (경로 필터 교체용)
+    private static List<string> SplitQueryTokens(string raw)
+    {
+        var tokens = new List<string>();
+        var sb = new System.Text.StringBuilder();
+        bool inQuote = false;
+        foreach (char c in raw)
+        {
+            if (c == '"') { inQuote = !inQuote; continue; }
+            if (c == ' ' && !inQuote)
+            {
+                if (sb.Length > 0) { tokens.Add(sb.ToString()); sb.Clear(); }
+                continue;
+            }
+            sb.Append(c);
+        }
+        if (sb.Length > 0) tokens.Add(sb.ToString());
+        return tokens;
+    }
+
+    // 공통: 행 목록을 CSV(UTF-8 BOM, 엑셀 호환)로 저장.
+    private void ExportRowsToCsv(IReadOnlyList<SearchResultRow> rows)
+    {
+        if (rows.Count == 0) return;
+
+        var dlg = new Microsoft.Win32.SaveFileDialog
+        {
+            Filter = "CSV (*.csv)|*.csv",
+            FileName = "HdrTracer_" + DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".csv",
+            DefaultExt = ".csv"
+        };
+        if (dlg.ShowDialog(this) != true) return;
+
+        static string Esc(string s)
+            => s.Contains('"') || s.Contains(',') || s.Contains('\n')
+               ? "\"" + s.Replace("\"", "\"\"") + "\""
+               : s;
+
+        try
+        {
+            var sb = new System.Text.StringBuilder(rows.Count * 96);
+            sb.Append(Loc.T("col.name")).Append(',')
+              .Append(Loc.T("col.path")).Append(',')
+              .Append(Loc.T("col.size")).Append(',')
+              .AppendLine(Loc.T("col.date"));
+
+            foreach (var r in rows)
+            {
+                sb.Append(Esc(r.Name)).Append(',')
+                  .Append(Esc(r.Path)).Append(',')
+                  .Append(r.SizeBytes).Append(',')
+                  .AppendLine(Esc(r.ModifiedText));
+            }
+
+            System.IO.File.WriteAllText(dlg.FileName, sb.ToString(), new System.Text.UTF8Encoding(true));
+            FooterText.Text = string.Format(Loc.T("export.done"), rows.Count);
+        }
+        catch (Exception ex)
+        {
+            InfoDialog.Show(this, Loc.T("common.error"), ex.Message);
+        }
+    }
+
+    // 앱 메뉴: 현재 검색 결과 전체 내보내기
+    private void ExportAllResults()
+    {
+        if (ResultsList.ItemsSource is List<SearchResultRow> rows && rows.Count > 0)
+            ExportRowsToCsv(rows);
+    }
+
+    // 우클릭 메뉴: 선택한 항목만 내보내기
+    private void MenuExportSelected_Click(object sender, RoutedEventArgs e)
+    {
+        var rows = GetSelectedRows();
+        if (rows.Count > 0) ExportRowsToCsv(rows);
     }
 
     private void MenuCopyPath_Click(object sender, RoutedEventArgs e)
@@ -2316,6 +2512,39 @@ public partial class MainWindow : Window
         AddFilter("exe",   "filter.exe");
         AddFilter("zip",   "filter.zip");
 
+        filterItem.Items.Add(new Separator());
+
+        // 크기 조건 (클릭하면 검색창에 문법이 들어가고 즉시 검색)
+        var sizeItem = new MenuItem { Header = Loc.T("filter.size") };
+        void AddSize(string locKey, string? token)
+        {
+            var mi = new MenuItem { Header = Loc.T(locKey) };
+            mi.Click += (_, _) => ApplyAttrFilter(isSize: true, token);
+            sizeItem.Items.Add(mi);
+        }
+        AddSize("filter.size.10mb",  ">10MB");
+        AddSize("filter.size.100mb", ">100MB");
+        AddSize("filter.size.1gb",   ">1GB");
+        sizeItem.Items.Add(new Separator());
+        AddSize("filter.clear", null);
+        filterItem.Items.Add(sizeItem);
+
+        // 기간 조건
+        var dateItem = new MenuItem { Header = Loc.T("filter.date") };
+        void AddDate(string locKey, string? token)
+        {
+            var mi = new MenuItem { Header = Loc.T(locKey) };
+            mi.Click += (_, _) => ApplyAttrFilter(isSize: false, token);
+            dateItem.Items.Add(mi);
+        }
+        AddDate("filter.date.today", ">today");
+        AddDate("filter.date.week",  ">week");
+        AddDate("filter.date.month", ">month");
+        AddDate("filter.date.year",  ">year");
+        dateItem.Items.Add(new Separator());
+        AddDate("filter.clear", null);
+        filterItem.Items.Add(dateItem);
+
         menu.Items.Add(filterItem);
 
         menu.Items.Add(new Separator());
@@ -2349,6 +2578,20 @@ public partial class MainWindow : Window
         menu.Items.Add(langItem);
 
         menu.Items.Add(new Separator());
+
+        // 검색 도움말
+        var searchHelpItem = new MenuItem { Header = Loc.T("menu.searchHelp") };
+        searchHelpItem.Click += (_, _) => InfoDialog.Show(this, Loc.T("help.search.title"), Loc.T("help.search.body"));
+        menu.Items.Add(searchHelpItem);
+
+        // 결과 내보내기 (현재 검색 결과 전체 → CSV)
+        var exportItem = new MenuItem
+        {
+            Header = Loc.T("menu.export"),
+            IsEnabled = ResultsList.ItemsSource is List<SearchResultRow> { Count: > 0 }
+        };
+        exportItem.Click += (_, _) => ExportAllResults();
+        menu.Items.Add(exportItem);
 
         // 정보
         var aboutItem = new MenuItem { Header = Loc.T("menu.about") };
@@ -2404,12 +2647,18 @@ public partial class MainWindow : Window
         CtxRunAsAdmin.Header = Loc.T("ctx.runAsAdmin");
         CtxOpenWith.Header   = Loc.T("ctx.openWith");
         CtxReveal.Header     = Loc.T("ctx.reveal");
+        CtxSearchFolder.Header = Loc.T("ctx.searchFolder");
+        CtxExport.Header     = Loc.T("ctx.export");
         CtxCopyPath.Header   = Loc.T("ctx.copyPath");
         CtxCopyName.Header   = Loc.T("ctx.copyName");
         CtxRename.Header     = Loc.T("ctx.rename");
         CtxCopyFile.Header   = Loc.T("ctx.copyFile");
         CtxDelete.Header     = Loc.T("ctx.delete");
         CtxProperties.Header = Loc.T("ctx.properties");
+        
+        SearchPlaceholder.Text = Loc.T("search.placeholder");
+        EmptyHintTitle.Text = Loc.T("empty.title");
+        EmptyHintBody.Text  = Loc.T("empty.body");
 
         // 푸터 요약 갱신 (총 N개 등)
         UpdateFooterSummary();

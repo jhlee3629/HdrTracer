@@ -41,6 +41,10 @@ public static class Localization
         ["menu.shortcuts"]    = "단축키",
         ["menu.about"]        = "정보",
         ["menu.language"]     = "언어",
+        ["menu.searchHelp"]   = "검색 도움말",
+        ["menu.export"]       = "결과 내보내기 (CSV)",
+        ["ctx.export"]        = "선택 항목 내보내기",
+        ["export.done"]       = "{0}개 항목을 CSV로 저장했습니다.",
 
         // 필터링 메뉴
         ["menu.filter"]  = "필터링",
@@ -53,11 +57,16 @@ public static class Localization
         ["tip.search"]   = "검색",
         ["tip.delete"]   = "삭제",
 
+        ["search.placeholder"] = "파일 이름 입력 후 Enter",
+        ["empty.title"] = "결과가 없습니다",
+        ["empty.body"]  = "검색어를 줄이거나 다르게 써보세요\n여러 단어는 모두 포함된 것만 찾습니다\n도움말: 메뉴(HdrTracer ▼) → 검색 도움말",
+
         // 검색 결과 우클릭 메뉴
         ["ctx.open"]       = "열기",
         ["ctx.runAsAdmin"] = "관리자 권한으로 실행",
         ["ctx.openWith"]   = "다른 프로그램으로 열기",
         ["ctx.reveal"]     = "폴더에서 보기",
+        ["ctx.searchFolder"] = "이 폴더에서만 검색",
         ["ctx.copyPath"]   = "경로 복사",
         ["ctx.copyName"]   = "이름 복사",
         ["ctx.rename"]     = "이름 바꾸기",
@@ -89,6 +98,16 @@ public static class Localization
         ["filter.media"] = "미디어",
         ["filter.exe"]   = "실행",
         ["filter.zip"]   = "압축",
+        ["filter.size"]       = "크기",
+        ["filter.size.10mb"]  = "10MB 이상",
+        ["filter.size.100mb"] = "100MB 이상",
+        ["filter.size.1gb"]   = "1GB 이상",
+        ["filter.date"]       = "기간",
+        ["filter.date.today"] = "오늘",
+        ["filter.date.week"]  = "최근 1주",
+        ["filter.date.month"] = "최근 1달",
+        ["filter.date.year"]  = "최근 1년",
+        ["filter.clear"]      = "조건 지우기",
 
         // 컬럼 헤더
         ["col.drive"] = "DRV",
@@ -148,6 +167,31 @@ public static class Localization
         ["sc.tip1"]         = "여러 단어를 공백으로 구분하면 모두 포함하는 결과를 찾습니다 (AND 검색).",
         ["sc.tip2"]         = "한글은 2글자, 영문은 3글자 이상부터 빠른 N-gram 검색이 동작합니다.",
 
+        ["help.search.title"] = "검색 도움말",
+        ["help.search.body"] =
+            "#기본 검색\n" +
+            "휴가 사진|'휴가'와 '사진'이 모두 이름에 있는 것 (공백 = 그리고)\n" +
+            "*.jpg|jpg 파일만  (여러 개 가능: *.jpg *.png)\n" +
+            "\n" +
+            "#빼고 싶은 게 있을 때\n" +
+            "보고서 -임시|이름에 '임시'가 있는 것은 빼고\n" +
+            "*.txt -*.log|txt는 찾고 log는 제외\n" +
+            "\n" +
+            "#특정 폴더 안에서만\n" +
+            "사진 D:\\백업\\|D:\\백업 폴더 아래에서만 '사진' 검색\n" +
+            "사진 \\여행\\|경로에 '여행' 폴더가 있는 것만\n" +
+            "사진 \"D:\\내 문서\\\"|공백이 있는 경로는 따옴표로 묶기\n" +
+            "\n" +
+            "#크기·날짜로 거르기\n" +
+            "*.mp4 >500MB|500MB보다 큰 mp4만 (단위 필수: KB MB GB TB)\n" +
+            ">1GB|1GB 넘는 파일 찾기 (단독 사용 가능)\n" +
+            "사진 >2026-01|2026년 1월 이후 수정된 것만 (연-월-일 순서)\n" +
+            "*.pdf <2024|2024년 이전에 수정된 pdf\n" +
+            "보고서 >week|최근 7일 (today · week · month · year)\n" +
+            "\n" +
+            "폴더 검색은 결과를 우클릭해 '이 폴더에서만 검색'을 눌러도 됩니다.\n" +
+            "경로만 입력하면 검색되지 않아요. 단어나 확장자와 함께 쓰세요.",
+
         // 정보 창
         ["about.title"]   = "정보",
         ["about.version"] = "버전 1.0",
@@ -177,6 +221,10 @@ public static class Localization
         ["menu.shortcuts"]    = "Shortcuts",
         ["menu.about"]        = "About",
         ["menu.language"]     = "Language",
+        ["menu.searchHelp"]   = "Search Help",
+        ["menu.export"]       = "Export results (CSV)",
+        ["ctx.export"]        = "Export selected items",
+        ["export.done"]       = "Saved {0} items to CSV.",
 
         // Filter menu
         ["menu.filter"]  = "Filter",
@@ -189,11 +237,16 @@ public static class Localization
         ["tip.search"]   = "Search",
         ["tip.delete"]   = "Delete",
 
+        ["search.placeholder"] = "Type a file name and press Enter",
+        ["empty.title"] = "No results",
+        ["empty.body"]  = "Try a shorter or different search term\nMultiple words match only items containing all of them\nHelp: menu (HdrTracer ▼) → Search help",
+
         // Search result context menu
         ["ctx.open"]       = "Open",
         ["ctx.runAsAdmin"] = "Run as administrator",
         ["ctx.openWith"]   = "Open with...",
         ["ctx.reveal"]     = "Show in folder",
+        ["ctx.searchFolder"] = "Search in this folder",
         ["ctx.copyPath"]   = "Copy path",
         ["ctx.copyName"]   = "Copy name",
         ["ctx.rename"]     = "Rename",
@@ -225,6 +278,16 @@ public static class Localization
         ["filter.media"] = "Media",
         ["filter.exe"]   = "Apps",
         ["filter.zip"]   = "Archives",
+        ["filter.size"]       = "Size",
+        ["filter.size.10mb"]  = "Over 10MB",
+        ["filter.size.100mb"] = "Over 100MB",
+        ["filter.size.1gb"]   = "Over 1GB",
+        ["filter.date"]       = "Date",
+        ["filter.date.today"] = "Today",
+        ["filter.date.week"]  = "Past week",
+        ["filter.date.month"] = "Past month",
+        ["filter.date.year"]  = "Past year",
+        ["filter.clear"]      = "Clear",
 
         // Column headers
         ["col.drive"] = "DRV",
@@ -283,6 +346,32 @@ public static class Localization
         ["sc.searchTips"]   = "Search Tips",
         ["sc.tip1"]         = "Separate multiple words with spaces to find results containing all of them (AND search).",
         ["sc.tip2"]         = "Fast N-gram search works for 2+ Korean characters or 3+ English characters.",
+
+        ["menu.searchHelp"] = "Search help",
+        ["help.search.title"] = "Search Help",
+        ["help.search.body"] =
+            "#Basic search\n" +
+            "vacation photo|names containing both words (space = AND)\n" +
+            "*.jpg|jpg files only  (multiple allowed: *.jpg *.png)\n" +
+            "\n" +
+            "#Excluding things\n" +
+            "report -draft|skip names containing 'draft'\n" +
+            "*.txt -*.log|find txt but not log\n" +
+            "\n" +
+            "#Only inside a folder\n" +
+            "photo D:\\Backup\\|search 'photo' only under D:\\Backup\n" +
+            "photo \\Trips\\|only items whose path has a 'Trips' folder\n" +
+            "photo \"D:\\My Docs\\\"|wrap paths with spaces in quotes\n" +
+            "\n" +
+            "#Filter by size / date\n" +
+            "*.mp4 >500MB|mp4 larger than 500MB (unit required: KB MB GB TB)\n" +
+            ">1GB|find files over 1GB (works alone)\n" +
+            "photo >2026-01|modified since Jan 2026 (year-month-day order)\n" +
+            "*.pdf <2024|pdf modified before 2024\n" +
+            "report >week|last 7 days (today · week · month · year)\n" +
+            "\n" +
+            "You can also right-click a result → 'Search in this folder'.\n" +
+            "A path alone finds nothing — combine it with a word or extension.",
 
         // About window
         ["about.title"]   = "About",

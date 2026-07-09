@@ -13,19 +13,36 @@ public sealed class SearchEngine
     /// </summary>
     public bool HideHiddenSystemItems { get; set; } = true;
 
+    /// <summary>추가 필터 묶음: 제외 단어/확장자, 경로, 크기, 수정 날짜.</summary>
+    private sealed class ExtraFilters
+    {
+        public string[] ExcludeTokens = Array.Empty<string>();
+        public HashSet<string> ExcludeExts = new(StringComparer.OrdinalIgnoreCase);
+        public string[] PathFilters = Array.Empty<string>();
+        public long SizeMin = -1;       // '>' 크기: 이 값 초과
+        public long SizeMax = -1;       // '<' 크기: 이 값 미만
+        public long DateMinTicks = 0;   // '>' 날짜: 이 시점(UTC Ticks) 이후(포함)
+        public long DateMaxTicks = 0;   // '<' 날짜: 이 시점(UTC Ticks) 이전(미포함)
+
+        public bool HasAttribute => SizeMin >= 0 || SizeMax >= 0 || DateMinTicks > 0 || DateMaxTicks > 0;
+        public bool Any => ExcludeTokens.Length > 0 || ExcludeExts.Count > 0
+                        || PathFilters.Length > 0 || HasAttribute;
+    }
+
     public List<SearchHit> Search(IReadOnlyList<FileIndex> indexes, string query, int maxResults = 1_000_000)
     {
         var results = new List<SearchHit>();
         if (indexes.Count == 0) return results;
 
-        // 쿼리에서 확장자 필터(*.ext / .ext)와 텍스트 토큰을 분리
-        var (textTokens, extFilter) = ParseQuery(query);
+        var (textTokens, extFilter, extra) = ParseQuery(query);
 
         bool hasText = textTokens.Length > 0;
         bool hasExt  = extFilter.Count > 0;
 
-        // 둘 다 없으면 결과 없음
-        if (!hasText && !hasExt) return results;
+        // 텍스트·확장자·크기/날짜 조건이 하나도 없으면 결과 없음.
+        // (제외·경로 필터만으로는 검색하지 않음 — 전체 경로 계산 비용 방지.
+        //  크기/날짜는 숫자 비교라 싸므로 단독 검색 허용: 예) ">1GB")
+        if (!hasText && !hasExt && !extra.HasAttribute) return results;
 
         bool excludeRecycle = ExcludeRecycleBin;
         bool hideHiddenSystem = HideHiddenSystemItems;
@@ -34,7 +51,8 @@ public sealed class SearchEngine
 
         Parallel.For(0, indexes.Count, i =>
         {
-            partials[i] = SearchOneIndex(indexes[i], textTokens, extFilter, excludeRecycle, hideHiddenSystem);
+            partials[i] = SearchOneIndex(indexes[i], textTokens, extFilter, extra,
+                excludeRecycle, hideHiddenSystem);
         });
 
         int total = 0;
@@ -56,30 +74,167 @@ public sealed class SearchEngine
     }
 
     /// <summary>
-    /// 검색어를 텍스트 토큰과 확장자 필터로 분리한다.
-    /// "보고서 *.pdf *.docx" → (["보고서"], {pdf, docx})
-    /// "*.png"               → ([], {png})
-    /// ".txt"                → ([], {txt})
+    /// 검색어를 분해한다.
+    /// "보고서 *.pdf"        → 텍스트 ["보고서"], 확장자 {pdf}
+    /// "보고서 -임시"        → 제외 단어 ["임시"]
+    /// "보고서 -*.tmp"       → 제외 확장자 {tmp}
+    /// "사진 D:\백업\"       → 경로 필터 (그 경로 아래만) / "\여행\" → 경로에 포함
+    /// "*.mp4 >500MB"        → 크기 조건 (단위 필수: B KB MB GB TB)
+    /// "사진 >2026-01"       → 날짜 조건 (연-월-일 부분 표기, 연도 선행이면 . / 구분도 허용)
+    /// "보고서 >week"        → 상대 날짜 (today / week / month / year)
     /// </summary>
-    private static (string[] textTokens, HashSet<string> exts) ParseQuery(string raw)
+    private static (string[] textTokens, HashSet<string> exts, ExtraFilters extra) ParseQuery(string raw)
     {
         var exts = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var textParts = new List<string>();
+        var textParts    = new List<string>();
+        var excludeParts = new List<string>();
+        var pathParts    = new List<string>();
+        var extra = new ExtraFilters();
 
         if (!string.IsNullOrWhiteSpace(raw))
         {
-            foreach (var token in raw.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            foreach (var token in Tokenize(raw))
             {
+                // 크기/날짜 조건: > 또는 < 로 시작
+                if (token.Length > 1 && (token[0] == '>' || token[0] == '<'))
+                {
+                    bool greater = token[0] == '>';
+                    string rest = token.Substring(1);
+
+                    if (TryParseSize(rest, out long bytes))
+                    {
+                        if (greater) extra.SizeMin = Math.Max(extra.SizeMin, bytes);
+                        else         extra.SizeMax = extra.SizeMax < 0 ? bytes : Math.Min(extra.SizeMax, bytes);
+                        continue;
+                    }
+                    if (TryParseDateStartUtc(rest, out long ticks))
+                    {
+                        if (greater) extra.DateMinTicks = Math.Max(extra.DateMinTicks, ticks);
+                        else         extra.DateMaxTicks = extra.DateMaxTicks == 0 ? ticks : Math.Min(extra.DateMaxTicks, ticks);
+                        continue;
+                    }
+                    // 해석 불가(예: ">abc") → 일반 텍스트 토큰으로 취급
+                    textParts.Add(token.ToLowerInvariant());
+                    continue;
+                }
+
+                // 제외: -단어 / -*.ext / -.ext
+                if (token.Length > 1 && token[0] == '-')
+                {
+                    string rest = token.Substring(1);
+                    if (rest.StartsWith("*.") && rest.Length > 2)
+                        extra.ExcludeExts.Add(rest.Substring(2));
+                    else if (rest.StartsWith(".") && rest.Length > 1 && !rest.Contains('\\'))
+                        extra.ExcludeExts.Add(rest.Substring(1));
+                    else
+                        excludeParts.Add(rest.ToLowerInvariant());
+                    continue;
+                }
+
+                // 경로 필터: '\' 를 포함하면 경로로 취급 ('/'도 허용)
+                if (token.Contains('\\') || token.Contains('/'))
+                {
+                    pathParts.Add(token.Replace('/', '\\'));
+                    continue;
+                }
+
                 if (token.StartsWith("*.") && token.Length > 2)
                     exts.Add(token.Substring(2));
-                else if (token.StartsWith(".") && token.Length > 1 && !token.Contains('\\'))
+                else if (token.StartsWith(".") && token.Length > 1)
                     exts.Add(token.Substring(1));
                 else
                     textParts.Add(token.ToLowerInvariant());
             }
         }
 
-        return (textParts.ToArray(), exts);
+        extra.ExcludeTokens = excludeParts.ToArray();
+        extra.PathFilters   = pathParts.ToArray();
+        return (textParts.ToArray(), exts, extra);
+    }
+
+    /// <summary>공백 분리하되 "큰따옴표" 묶음은 하나의 토큰으로(따옴표 제거). 공백 포함 경로용.</summary>
+    private static List<string> Tokenize(string raw)
+    {
+        var tokens = new List<string>();
+        var sb = new System.Text.StringBuilder();
+        bool inQuote = false;
+        foreach (char c in raw)
+        {
+            if (c == '"') { inQuote = !inQuote; continue; }
+            if (c == ' ' && !inQuote)
+            {
+                if (sb.Length > 0) { tokens.Add(sb.ToString()); sb.Clear(); }
+                continue;
+            }
+            sb.Append(c);
+        }
+        if (sb.Length > 0) tokens.Add(sb.ToString());
+        return tokens;
+    }
+
+    /// <summary>"500KB", "1.5GB" 형태를 바이트로. 단위(B/KB/MB/GB/TB) 필수. 실패 시 false.</summary>
+    private static bool TryParseSize(string s, out long bytes)
+    {
+        bytes = 0;
+        int i = 0;
+        while (i < s.Length && (char.IsDigit(s[i]) || s[i] == '.')) i++;
+        if (i == 0 || i == s.Length) return false;   // 숫자 없음 또는 단위 없음
+
+        if (!double.TryParse(s.Substring(0, i), System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out double num) || num < 0)
+            return false;
+
+        double mul = s.Substring(i).Trim().ToUpperInvariant() switch
+        {
+            "B"  => 1d,
+            "KB" => 1024d,
+            "MB" => 1024d * 1024,
+            "GB" => 1024d * 1024 * 1024,
+            "TB" => 1024d * 1024 * 1024 * 1024,
+            _    => -1d
+        };
+        if (mul < 0) return false;
+
+        double v = num * mul;
+        if (v > 9.2e18) return false;
+        bytes = (long)v;
+        return true;
+    }
+
+    /// <summary>
+    /// 날짜 토큰을 "그 기간의 시작 시점"(UTC Ticks)으로 해석.
+    /// 허용: 2026 / 2026-01 / 2026-01-15 (연도 선행이면 구분자 . / 도 허용: 2026.1.15, 2026/01/15)
+    /// 상대: today(오늘), week(최근 7일), month(최근 30일), year(최근 1년)
+    /// </summary>
+    private static bool TryParseDateStartUtc(string s, out long utcTicks)
+    {
+        utcTicks = 0;
+        string t = s.Trim();
+        if (t.Length == 0) return false;
+
+        switch (t.ToLowerInvariant())
+        {
+            case "today": utcTicks = DateTime.Now.Date.ToUniversalTime().Ticks; return true;
+            case "week":  utcTicks = DateTime.Now.Date.AddDays(-7).ToUniversalTime().Ticks; return true;
+            case "month": utcTicks = DateTime.Now.Date.AddDays(-30).ToUniversalTime().Ticks; return true;
+            case "year":  utcTicks = DateTime.Now.Date.AddYears(-1).ToUniversalTime().Ticks; return true;
+        }
+
+        var parts = t.Split('-', '.', '/');
+        if (parts.Length > 3) return false;
+        if (parts[0].Length != 4 || !int.TryParse(parts[0], out int y) || y < 1970 || y > 2999) return false;
+
+        int m = 1, d = 1;
+        if (parts.Length >= 2 && (!int.TryParse(parts[1], out m) || m < 1 || m > 12)) return false;
+        if (parts.Length == 3 && (!int.TryParse(parts[2], out d) || d < 1 || d > 31)) return false;
+
+        try
+        {
+            var local = new DateTime(y, m, d, 0, 0, 0, DateTimeKind.Local);
+            utcTicks = local.ToUniversalTime().Ticks;
+            return true;
+        }
+        catch { return false; }
     }
 
     /// <summary>파일명이 확장자 필터에 맞는지. exts가 비면 항상 통과.</summary>
@@ -92,36 +247,83 @@ public sealed class SearchEngine
     }
 
     /// <summary>
+    /// 추가 필터 통과 여부. 싼 검사(크기/날짜 숫자 비교) → 이름 검사 → 비싼 경로 계산 순.
+    /// 다른 필터를 모두 통과한 항목에만 마지막으로 적용할 것.
+    /// </summary>
+    private static bool PassesExtraFilters(FileIndex index, int entryIndex, ReadOnlySpan<char> name, ExtraFilters f)
+    {
+        if (f.SizeMin >= 0 || f.SizeMax >= 0)
+        {
+            long size = index.GetSize(entryIndex);
+            if (f.SizeMin >= 0 && size <= f.SizeMin) return false;
+            if (f.SizeMax >= 0 && size >= f.SizeMax) return false;
+        }
+
+        if (f.DateMinTicks > 0 || f.DateMaxTicks > 0)
+        {
+            long ticks = index.GetModifiedUtc(entryIndex).Ticks;
+            if (f.DateMinTicks > 0 && ticks < f.DateMinTicks) return false;
+            if (f.DateMaxTicks > 0 && ticks >= f.DateMaxTicks) return false;
+        }
+
+        for (int t = 0; t < f.ExcludeTokens.Length; t++)
+        {
+            if (name.IndexOf(f.ExcludeTokens[t], StringComparison.OrdinalIgnoreCase) >= 0)
+                return false;
+        }
+
+        if (f.ExcludeExts.Count > 0 && MatchesExtension(name, f.ExcludeExts))
+            return false;
+
+        if (f.PathFilters.Length > 0)
+        {
+            string? path = index.GetFullPath(entryIndex);
+            if (path is null) return false;
+            foreach (var pf in f.PathFilters)
+            {
+                bool ok = (pf.Length >= 2 && pf[1] == ':')
+                    ? path.StartsWith(pf, StringComparison.OrdinalIgnoreCase)
+                    : path.IndexOf(pf, StringComparison.OrdinalIgnoreCase) >= 0;
+                if (!ok) return false;
+            }
+        }
+
+        return true;
+    }
+
+    /// <summary>
     /// 단일 인덱스에 대해 검색.
-    /// 텍스트 토큰이 있으면 N-gram 후보 우선, 없으면(확장자만) 전체 선형 스캔.
-    /// 확장자 필터는 항상 마지막에 적용.
+    /// 텍스트 토큰이 있으면 N-gram 후보 우선, 없으면(확장자/크기/날짜만) 전체 선형 스캔.
     /// </summary>
     private static List<SearchHit> SearchOneIndex(
-        FileIndex index, string[] tokens, HashSet<string> extFilter, bool excludeRecycle, bool hideHiddenSystem)
+        FileIndex index, string[] tokens, HashSet<string> extFilter, ExtraFilters extra,
+        bool excludeRecycle, bool hideHiddenSystem)
     {
         var local = new List<SearchHit>(1024);
         int count = index.Count;
         bool hasText = tokens.Length > 0;
         bool hasExt  = extFilter.Count > 0;
+        bool hasExtra = extra.Any;
 
         if (!hasText)
         {
-            // === 확장자만: 전체 선형 스캔 (파일만) ===
+            // === 확장자/크기/날짜만: 전체 선형 스캔 (파일만) ===
             for (int j = 0; j < count; j++)
             {
                 if (index.IsDeleted(j)) continue;
-                if (index.IsDirectory(j)) continue;   // 확장자 필터는 파일 대상
+                if (index.IsDirectory(j)) continue;   // 파일 속성 필터는 파일 대상
 
                 var name = index.GetNameSpan(j);
-                if (!MatchesExtension(name, extFilter)) continue;
+                if (hasExt && !MatchesExtension(name, extFilter)) continue;
                 if (hideHiddenSystem && index.IsHiddenSystemEffective(j)) continue;
                 if (excludeRecycle && IsInRecycleBin(index, j)) continue;
+                if (hasExtra && !PassesExtraFilters(index, j, name, extra)) continue;
                 local.Add(new SearchHit(index, j));
             }
             return local;
         }
 
-        // === 텍스트 검색 (+ 선택적 확장자 필터) ===
+        // === 텍스트 검색 (+ 선택적 필터) ===
         int[]? candidates = TryGetCandidatesViaNgram(index, tokens);
 
         if (candidates is not null)
@@ -135,9 +337,12 @@ public sealed class SearchEngine
                 {
                     if (j >= count) continue;
                     if (index.IsDeleted(j)) continue;
-                    if (hasExt && !MatchesExtension(index.GetNameSpan(j), extFilter)) continue;
+
+                    var name = index.GetNameSpan(j);
+                    if (hasExt && !MatchesExtension(name, extFilter)) continue;
                     if (hideHiddenSystem && index.IsHiddenSystemEffective(j)) continue;
                     if (excludeRecycle && IsInRecycleBin(index, j)) continue;
+                    if (hasExtra && !PassesExtraFilters(index, j, name, extra)) continue;
                     local.Add(new SearchHit(index, j));
                 }
             }
@@ -153,6 +358,7 @@ public sealed class SearchEngine
                     if (hasExt && !MatchesExtension(name, extFilter)) continue;
                     if (hideHiddenSystem && index.IsHiddenSystemEffective(j)) continue;
                     if (excludeRecycle && IsInRecycleBin(index, j)) continue;
+                    if (hasExtra && !PassesExtraFilters(index, j, name, extra)) continue;
                     local.Add(new SearchHit(index, j));
                 }
             }
@@ -167,6 +373,7 @@ public sealed class SearchEngine
                 if (hasExt && !MatchesExtension(name, extFilter)) continue;
                 if (hideHiddenSystem && index.IsHiddenSystemEffective(j)) continue;
                 if (excludeRecycle && IsInRecycleBin(index, j)) continue;
+                if (hasExtra && !PassesExtraFilters(index, j, name, extra)) continue;
                 local.Add(new SearchHit(index, j));
             }
         }
@@ -182,6 +389,7 @@ public sealed class SearchEngine
                 if (hasExt && !MatchesExtension(name, extFilter)) continue;
                 if (hideHiddenSystem && index.IsHiddenSystemEffective(j)) continue;
                 if (excludeRecycle && IsInRecycleBin(index, j)) continue;
+                if (hasExtra && !PassesExtraFilters(index, j, name, extra)) continue;
                 local.Add(new SearchHit(index, j));
             }
         }
