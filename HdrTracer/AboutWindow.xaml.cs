@@ -24,7 +24,9 @@ public partial class AboutWindow : Window
     {
         Title          = Loc.T("about.title");
         TitleText.Text = Loc.T("about.title");
-        VersionText.Text = Loc.T("about.version");
+        var v = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
+        VersionText.Text = string.Format(Loc.T("about.version"),
+            v is null ? "?" : $"{v.Major}.{v.Minor}.{v.Build}");
         DescText.Text  = Loc.T("about.desc");
     }
 

@@ -194,7 +194,7 @@ public static class Localization
 
         // 정보 창
         ["about.title"]   = "정보",
-        ["about.version"] = "버전 1.0",
+        ["about.version"] = "버전 {0}",
         ["about.desc"]    = "NTFS 파일 시스템을 직접 읽어 빠르게 검색하는 도구입니다.",
 
         // 인덱스 새로 고침 다이얼로그
@@ -375,7 +375,7 @@ public static class Localization
 
         // About window
         ["about.title"]   = "About",
-        ["about.version"] = "Version 1.0",
+        ["about.version"] = "Version {0}",
         ["about.desc"]    = "A tool that reads the NTFS file system directly for fast searching.",
 
         // Refresh index dialog

@@ -23,9 +23,9 @@
     <Description>NTFS raw MFT 기반 초고속 파일 검색기</Description>
     <Company>HdrTracer</Company>
     <Copyright>Copyright © 2026</Copyright>
-    <Version>1.0.0</Version>
-    <AssemblyVersion>1.0.0.0</AssemblyVersion>
-    <FileVersion>1.0.0.0</FileVersion>
+    <Version>1.0.5</Version>
+    <AssemblyVersion>1.0.5.0</AssemblyVersion>
+    <FileVersion>1.0.5.0</FileVersion>
 
     <!-- 단일 exe 배포 빌드 옵션 (dotnet publish 명령에서만 의미 있음) -->
     <PublishSingleFile>true</PublishSingleFile>
