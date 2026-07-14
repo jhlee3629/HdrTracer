@@ -56,6 +56,7 @@ public static class Localization
         ["tip.close"]    = "닫기",
         ["tip.search"]   = "검색",
         ["tip.delete"]   = "삭제",
+        ["tip.pin"]      = "고정/해제",
 
         ["search.placeholder"] = "파일 이름 입력 후 Enter",
         ["empty.title"] = "결과가 없습니다",
@@ -122,6 +123,7 @@ public static class Localization
         ["status.items"]    = "개",
         ["status.results"]  = "개 결과",
         ["status.refreshDone"] = "인덱스 새로 고침 완료",
+        ["status.selected"] = "{0}개 선택, {1}",
 
         // 트레이
         ["tray.open"] = "HdrTracer 열기",
@@ -139,6 +141,9 @@ public static class Localization
         ["settings.ok"]         = "확인",
         ["settings.usbOn"]      = "확인 누르면 USB 드라이브를 인덱싱합니다.",
         ["settings.usbOff"]     = "확인 누르면 인덱싱된 USB 데이터를 메모리에서 제거합니다.",
+        ["settings.autostart"]      = "Windows 시작 시 자동 실행",
+        ["settings.autostart.desc"] = "로그인하면 트레이에 자동으로 실행됩니다. (작업 스케줄러 등록, UAC 없음)",
+        ["settings.autostart.fail"] = "자동 실행 설정 변경에 실패했습니다.",
 
         // 단축키 창
         ["sc.title"]        = "단축키",
@@ -181,6 +186,12 @@ public static class Localization
             "사진 D:\\백업\\|D:\\백업 폴더 아래에서만 '사진' 검색\n" +
             "사진 \\여행\\|경로에 '여행' 폴더가 있는 것만\n" +
             "사진 \"D:\\내 문서\\\"|공백이 있는 경로는 따옴표로 묶기\n" +
+            "\n" +
+            "#이름 모양으로 찾기 (와일드카드)\n" +
+            "IMG_*_편집|IMG_로 시작하고 _편집으로 끝나는 이름\n" +
+            "보고서*최종.hwp|'보고서'로 시작해 '최종.hwp'로 끝나는 형식\n" +
+            "가을_?.jpg|? 는 글자 하나 (가을_1은 되고 가을_12는 안 됨)\n" +
+            "* 이 있으면 이름 전체가 그 모양과 일치해야 합니다.\n" +
             "\n" +
             "#크기·날짜로 거르기\n" +
             "*.mp4 >500MB|500MB보다 큰 mp4만 (단위 필수: KB MB GB TB)\n" +
@@ -236,6 +247,7 @@ public static class Localization
         ["tip.close"]    = "Close",
         ["tip.search"]   = "Search",
         ["tip.delete"]   = "Delete",
+        ["tip.pin"]      = "Pin / Unpin",
 
         ["search.placeholder"] = "Type a file name and press Enter",
         ["empty.title"] = "No results",
@@ -302,6 +314,7 @@ public static class Localization
         ["status.items"]    = " items",
         ["status.results"]  = "results",
         ["status.refreshDone"] = "Index refresh complete",
+        ["status.selected"] = "{0} selected, {1}",
 
         // Tray
         ["tray.open"] = "Open HdrTracer",
@@ -319,6 +332,9 @@ public static class Localization
         ["settings.ok"]         = "OK",
         ["settings.usbOn"]      = "USB drives will be indexed when you click OK.",
         ["settings.usbOff"]     = "Indexed USB data will be removed from memory when you click OK.",
+        ["settings.autostart"]      = "Start with Windows",
+        ["settings.autostart.desc"] = "Runs in the tray automatically at sign-in (Task Scheduler, no UAC prompt).",
+        ["settings.autostart.fail"] = "Failed to change the auto-start setting.",
 
         // Shortcuts window
         ["sc.title"]        = "Shortcuts",
@@ -362,6 +378,12 @@ public static class Localization
             "photo D:\\Backup\\|search 'photo' only under D:\\Backup\n" +
             "photo \\Trips\\|only items whose path has a 'Trips' folder\n" +
             "photo \"D:\\My Docs\\\"|wrap paths with spaces in quotes\n" +
+            "\n" +
+            "#Match by name shape (wildcards)\n" +
+            "IMG_*_edit|names starting IMG_ and ending _edit\n" +
+            "report*final.docx|starts with 'report', ends 'final.docx'\n" +
+            "photo_?.jpg|? is a single character (photo_1 yes, photo_12 no)\n" +
+            "With * the whole name must match the shape.\n" +
             "\n" +
             "#Filter by size / date\n" +
             "*.mp4 >500MB|mp4 larger than 500MB (unit required: KB MB GB TB)\n" +

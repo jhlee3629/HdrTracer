@@ -525,6 +525,8 @@ public partial class MainWindow : Window
     // ==================================================
     private void UpdateFooterSummary()
     {
+        if (DateTime.UtcNow < _footerNoticeUntil) return;   // 알림 문구 보호 중엔 덮지 않음
+
         var slots = _multi.Slots;
         if (slots.Count == 0)
         {
@@ -650,21 +652,29 @@ public partial class MainWindow : Window
 
     private void ShowHistoryPopup()
     {
-        var h = _settings.SearchHistory;
-        if (h is null || h.Count == 0)
-        {
-            HistoryPopup.IsOpen = false;
-            return;
-        }
-        // 검색창에 입력 중이면 표시 안 함 (검색 결과가 우선)
         if (!string.IsNullOrEmpty(SearchBox.Text))
         {
             HistoryPopup.IsOpen = false;
             return;
         }
 
+        // 고정 검색을 위에, 일반 히스토리를 아래에 (고정과 같은 검색어는 히스토리에서 숨김)
+        var pinned = _settings.PinnedSearches;
+        var items = new List<HistoryItem>();
+        foreach (var p in pinned)
+            items.Add(new HistoryItem { Query = p, IsPinned = true });
+        foreach (var q in _settings.SearchHistory)
+            if (!pinned.Any(p => string.Equals(p, q, StringComparison.OrdinalIgnoreCase)))
+                items.Add(new HistoryItem { Query = q });
+
+        if (items.Count == 0)
+        {
+            HistoryPopup.IsOpen = false;
+            return;
+        }
+
         HistoryList.ItemsSource = null;
-        HistoryList.ItemsSource = h.ToList();
+        HistoryList.ItemsSource = items;
         HistoryPopup.IsOpen = true;
     }
 
@@ -701,12 +711,12 @@ public partial class MainWindow : Window
             return;
         }
 
-        if (HistoryList.SelectedItem is not string picked) return;
+        if (HistoryList.SelectedItem is not HistoryItem picked) return;
 
         HistoryPopup.IsOpen = false;
         HistoryList.SelectedItem = null;
 
-        SearchBox.Text = picked;
+        SearchBox.Text = picked.Query;
         SearchBox.CaretIndex = SearchBox.Text.Length;
         SearchBox.Focus();
 
@@ -716,27 +726,41 @@ public partial class MainWindow : Window
 
     private void HistoryDelete_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is not Button btn || btn.Tag is not string item) return;
+        if (sender is not Button btn || btn.Tag is not HistoryItem item) return;
 
+        // ✕ = 완전 삭제: 고정 목록과 히스토리 양쪽에서 제거
+        // (고정된 검색어도 히스토리에 남아 있어, 한쪽만 지우면 "고정 해제"처럼 보인다)
+        _settings.PinnedSearches.RemoveAll(
+            x => string.Equals(x, item.Query, StringComparison.OrdinalIgnoreCase));
         _settings.SearchHistory.RemoveAll(
-            x => string.Equals(x, item, StringComparison.OrdinalIgnoreCase));
+            x => string.Equals(x, item.Query, StringComparison.OrdinalIgnoreCase));
         _settings.Save();
 
-        // 목록 갱신
-        if (_settings.SearchHistory.Count == 0)
-            HistoryPopup.IsOpen = false;
-        else
-        {
-            HistoryList.ItemsSource = null;
-            HistoryList.ItemsSource = _settings.SearchHistory.ToList();
-        }
+        ShowHistoryPopup();   // 목록 재구성 (전부 비면 스스로 닫음)
 
         e.Handled = true;  // ListBox 선택으로 전파 방지
+    }
+
+    private void HistoryPin_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button btn || btn.Tag is not HistoryItem item) return;
+
+        var p = _settings.PinnedSearches;
+        p.RemoveAll(x => string.Equals(x, item.Query, StringComparison.OrdinalIgnoreCase));
+        if (!item.IsPinned)
+            p.Insert(0, item.Query);   // 고정: 맨 위로
+        _settings.Save();
+
+        ShowHistoryPopup();   // 팝업 열린 채 목록만 갱신
+
+        e.Handled = true;
     }
 
     private async void RunSearch(bool isAuto = false)
     {
         var query = SearchBox.Text;
+
+        if (!isAuto) _footerNoticeUntil = DateTime.MinValue;   // 직접 행동 → 알림 보호 해제
 
         // 검색 시작 → 사전로딩 일시 중단, 검색 끝난 후 1.5초 뒤 재개
         foreach (var p in _preloaders) p.Pause();
@@ -848,9 +872,15 @@ public partial class MainWindow : Window
             if (!isAuto)
                 _lastSearchMs = sw.ElapsedMilliseconds;
 
-            FooterText.Text = sortedRows.Count >= MaxDisplayResults
-                ? $"{sortedRows.Count:N0}+ {Loc.T("status.results")} ({_lastSearchMs}ms)"
-                : $"{sortedRows.Count:N0} {Loc.T("status.results")} ({_lastSearchMs}ms)";
+            // 직접 검색은 즉시 갱신. 자동 재검색은 최근 알림(삭제 결과 등)을 3초간 존중.
+            if (!isAuto || DateTime.UtcNow >= _footerNoticeUntil)
+            {
+                FooterText.Text = sortedRows.Count >= MaxDisplayResults
+                    ? $"{sortedRows.Count:N0}+ {Loc.T("status.results")} ({_lastSearchMs}ms)"
+                    : $"{sortedRows.Count:N0} {Loc.T("status.results")} ({_lastSearchMs}ms)";
+            }
+
+            _footerBeforeSelection = null;   // 새 검색 → 이전 선택 요약의 복원 문구 무효화
         }
         catch (OperationCanceledException)
         { }
@@ -1345,9 +1375,9 @@ public partial class MainWindow : Window
         if (e.Key == Key.Enter)
         {
             // 히스토리에서 강조된 항목이 있으면 그 검색어를 검색창에 넣고 실행한다.
-            if (HistoryPopup.IsOpen && HistoryList.SelectedItem is string highlighted)
+            if (HistoryPopup.IsOpen && HistoryList.SelectedItem is HistoryItem highlighted)
             {
-                SearchBox.Text = highlighted;
+                SearchBox.Text = highlighted.Query;
                 SearchBox.CaretIndex = SearchBox.Text.Length;
             }
             HistoryPopup.IsOpen = false;
@@ -1423,6 +1453,44 @@ public partial class MainWindow : Window
                 System.Windows.DragDropEffects.Copy | System.Windows.DragDropEffects.Move);
         }
         catch { /* 드래그 취소 등은 무시 */ }
+    }
+
+    // 선택 항목 요약: 하단에 "N개 선택, 총 크기"를 표시하고, 해제되면 이전 문구 복원.
+    private string? _footerBeforeSelection;
+
+    // 하단 알림 문구(삭제 결과 등)를 자동 재검색이 잠시 덮지 못하게 보호하는 시각
+    private DateTime _footerNoticeUntil = DateTime.MinValue;
+
+    /// <summary>하단에 알림 문구를 표시하고 3초간 자동 갱신으로부터 보호한다.</summary>
+    private void ShowFooterNotice(string text)
+    {
+        FooterText.Text = text;
+        _footerBeforeSelection = null;                       // 선택 해제 복원에 덮이지 않게
+        //_footerNoticeUntil = DateTime.UtcNow.AddSeconds(6);  // 자동 재검색 갱신으로부터 보호
+        _footerNoticeUntil = DateTime.MaxValue;  // 사용자가 직접 행동할 때까지 유지
+    }
+
+    private void ResultsList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        int n = ResultsList.SelectedItems.Count;
+        if (n == 0)
+        {
+            if (_footerBeforeSelection != null)
+            {
+                FooterText.Text = _footerBeforeSelection;
+                _footerBeforeSelection = null;
+            }
+            return;
+        }
+
+        _footerBeforeSelection ??= FooterText.Text;   // 처음 선택될 때의 문구를 기억
+
+        long total = 0;
+        foreach (var it in ResultsList.SelectedItems)
+            if (it is SearchResultRow r) total += r.SizeBytes;
+
+        FooterText.Text = string.Format(Loc.T("status.selected"),
+            n, HdrTracer.Core.FileInfoFetcher.FormatSize(total));
     }
 
     // 빈 공간에서 컨텍스트 메뉴 열리는 것을 막는다 (탐색기와 동일한 동작)
@@ -1604,9 +1672,9 @@ public partial class MainWindow : Window
         if (ok > 0 && !string.IsNullOrWhiteSpace(SearchBox.Text))
             AddToHistory(SearchBox.Text);
 
-        FooterText.Text = fail == 0
+        ShowFooterNotice(fail == 0
             ? string.Format(Loc.T("ctx.open.multi"), ok)
-            : string.Format(Loc.T("ctx.open.partial"), ok, fail);
+            : string.Format(Loc.T("ctx.open.partial"), ok, fail));
     }
 
     // 실행 가능한 확장자 (관리자 권한 실행 가능 여부 판단용)
@@ -2179,16 +2247,16 @@ public partial class MainWindow : Window
             }
         }
 
-        // 결과 푸터 표시
+        // 결과 푸터 표시 (알림 보호: 자동 갱신이 덮지 못하게)
         if (fail == 0)
         {
-            FooterText.Text = rows.Count == 1
+            ShowFooterNotice(rows.Count == 1
                 ? $"{Loc.T("ctx.delete.title")}: {rows[0].Name}"
-                : string.Format(Loc.T("ctx.delete.done.multi"), ok);
+                : string.Format(Loc.T("ctx.delete.done.multi"), ok));
         }
         else
         {
-            FooterText.Text = string.Format(Loc.T("ctx.delete.partial"), ok, fail);
+            ShowFooterNotice(string.Format(Loc.T("ctx.delete.partial"), ok, fail));
             if (lastError != null)
                 MessageBox.Show(lastError, Loc.T("ctx.error"), MessageBoxButton.OK, MessageBoxImage.Error);
         }
@@ -2641,6 +2709,7 @@ public partial class MainWindow : Window
         SearchButton.ToolTip       = Loc.T("tip.search");
         // 히스토리 삭제 버튼(DataTemplate 안)은 동적 리소스로 갱신
         Resources["TipDelete"]     = Loc.T("tip.delete");
+        Resources["TipPin"]        = Loc.T("tip.pin");
 
         // 검색 결과 우클릭 메뉴
         CtxOpen.Header       = Loc.T("ctx.open");
@@ -2969,4 +3038,13 @@ public sealed class SearchResultRow
             _modifiedText = HdrTracer.Core.FileInfoFetcher.FormatDate(info.ModifiedUtc);
         }
     }
+}
+
+/// <summary>히스토리 팝업 항목: 고정(📌) 여부를 아는 검색어.</summary>
+public sealed class HistoryItem
+{
+    public string Query { get; init; } = "";
+    public bool IsPinned { get; init; }
+    public string Display  => (IsPinned ? "\uD83D\uDCCC " : "") + Query;   // 📌 접두
+    public string PinGlyph => IsPinned ? "\uE77A" : "\uE718";              // MDL2: Unpin / Pin
 }

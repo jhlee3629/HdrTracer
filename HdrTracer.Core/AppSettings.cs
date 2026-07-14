@@ -19,6 +19,7 @@ public sealed class AppSettings
 
     /// <summary>최근 검색 히스토리 (최신이 앞, 최대 10개). 영구 저장됨.</summary>
     public List<string> SearchHistory { get; set; } = new();
+    public List<string> PinnedSearches { get; set; } = new();
 
     /// <summary>컬럼 너비(픽셀). 경로는 * 채움이라 저장 안 함. 0 이하면 기본값 사용.
     /// 기본값은 XAML 디자인값과 동일.</summary>

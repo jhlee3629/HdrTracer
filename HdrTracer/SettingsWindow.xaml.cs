@@ -12,6 +12,7 @@ public partial class SettingsWindow : Window
 
     private readonly bool _initialRemovable;
     private readonly bool _initialShowHidden;
+    private readonly bool _initialAutoStart;
 
     public SettingsWindow(AppSettings settings)
     {
@@ -20,6 +21,8 @@ public partial class SettingsWindow : Window
         _initialRemovable = settings.IndexRemovableDrives;
         _initialShowHidden = settings.ShowHiddenSystemItems;
         RemovableCheckBox.IsChecked = settings.IndexRemovableDrives;
+        _initialAutoStart = AutoStartManager.IsRegistered();   // 실제 등록 상태를 조회해 표시
+        AutoStartCheckBox.IsChecked = _initialAutoStart;
         TrayCheckBox.IsChecked = settings.MinimizeToTrayOnClose;
         HiddenSystemCheckBox.IsChecked = settings.ShowHiddenSystemItems;
 
@@ -53,6 +56,8 @@ public partial class SettingsWindow : Window
         TrayDesc.Text  = Loc.T("settings.tray.desc");
         HiddenTitle.Text = Loc.T("settings.hidden");
         HiddenDesc.Text  = Loc.T("settings.hidden.desc");
+        AutoStartTitle.Text = Loc.T("settings.autostart");
+        AutoStartDesc.Text  = Loc.T("settings.autostart.desc");
         OkButton.Content = Loc.T("settings.ok");
     }
 
@@ -86,6 +91,16 @@ public partial class SettingsWindow : Window
 
         Settings.MinimizeToTrayOnClose = TrayCheckBox.IsChecked ?? false;
         Settings.Save();
+
+        // 자동 실행: 바뀐 경우에만 스케줄러 등록/해제
+        bool autoStart = AutoStartCheckBox.IsChecked ?? false;
+        if (autoStart != _initialAutoStart)
+        {
+            bool ok = autoStart ? AutoStartManager.Register() : AutoStartManager.Unregister();
+            if (!ok)
+                InfoDialog.Show(this, Loc.T("common.error"), Loc.T("settings.autostart.fail"));
+        }
+
         DialogResult = true;
         Close();
     }

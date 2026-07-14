@@ -75,6 +75,7 @@
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
             <TextBlock Grid.Row="0"
@@ -153,7 +154,30 @@
                         FocusVisualStyle="{StaticResource BrightFocusVisual}"/>
             </Grid>
 
-            <TextBlock Grid.Row="4"
+            <!-- Windows 시작 시 자동 실행 토글 -->
+            <Grid Grid.Row="4" Margin="0,16,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                    <TextBlock x:Name="AutoStartTitle" Text="Windows 시작 시 자동 실행"
+                            Foreground="White"
+                            FontSize="13"/>
+                    <TextBlock x:Name="AutoStartDesc" Text="로그인하면 트레이에 자동으로 실행됩니다. (작업 스케줄러 등록, UAC 없음)"
+                            Foreground="#888"
+                            FontSize="11"
+                            Margin="0,2,0,0"
+                            TextWrapping="Wrap"/>
+                </StackPanel>
+                <CheckBox Grid.Column="1"
+                        x:Name="AutoStartCheckBox"
+                        VerticalAlignment="Center"
+                        Style="{StaticResource DarkToggleStyle}"
+                        FocusVisualStyle="{StaticResource BrightFocusVisual}"/>
+            </Grid>
+
+            <TextBlock Grid.Row="5"
                     x:Name="StatusText"
                     Foreground="#7CB7FF"
                     FontSize="11"

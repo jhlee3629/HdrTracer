@@ -301,15 +301,27 @@
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*"/>
                                         <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="Auto"/>
                                     </Grid.ColumnDefinitions>
                                     <TextBlock Grid.Column="0"
-                                               Text="{Binding}"
+                                               Text="{Binding Display}"
                                                Foreground="#DDDDDD"
                                                FontSize="13"
                                                VerticalAlignment="Center"
                                                TextTrimming="CharacterEllipsis"
                                                Margin="10,7,6,7"/>
                                     <Button Grid.Column="1"
+                                            Content="{Binding PinGlyph}"
+                                            Tag="{Binding}"
+                                            Click="HistoryPin_Click"
+                                            FontFamily="Segoe MDL2 Assets"
+                                            FontSize="10"
+                                            Foreground="#888"
+                                            Background="Transparent"
+                                            BorderThickness="0"
+                                            Width="28"
+                                            ToolTip="{DynamicResource TipPin}"/>
+                                    <Button Grid.Column="2"
                                             Content="&#xE711;"
                                             Tag="{Binding}"
                                             Click="HistoryDelete_Click"
@@ -318,7 +330,6 @@
                                             Foreground="#888"
                                             Background="Transparent"
                                             BorderThickness="0"
-                                            Cursor="Hand"
                                             Width="28"
                                             ToolTip="{DynamicResource TipDelete}"/>
                                 </Grid>
@@ -478,6 +489,7 @@
                             MouseDoubleClick="ResultsList_MouseDoubleClick"
                             PreviewMouseLeftButtonDown="ResultsList_PreviewMouseLeftButtonDown"
                             MouseMove="ResultsList_MouseMove"
+                            SelectionChanged="ResultsList_SelectionChanged"
                             ContextMenuOpening="ResultsList_ContextMenuOpening"
                             PreviewKeyDown="ResultsList_KeyDown"
                             ScrollViewer.ScrollChanged="ResultsList_ScrollChanged">

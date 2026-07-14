@@ -6,7 +6,7 @@
 ; ============================================================
 
 #define MyAppName "HdrTracer"
-#define MyAppVersion "1.0.5"
+#define MyAppVersion "1.0.6"
 #define MyAppPublisher "HdrTracer"
 #define MyAppExeName "HdrTracer.exe"
 
@@ -84,3 +84,6 @@ Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#MyAppName}}
 ; 제거 시 인덱스 캐시/설정 폴더도 함께 삭제 (찌꺼기 안 남기기)
 ; %LocalAppData%\HdrTracer 전체 (indexes\*.dat, settings.json 등)
 Type: filesandordirs; Name: "{localappdata}\{#MyAppName}"
+
+[UninstallRun]
+Filename: "schtasks.exe"; Parameters: "/Delete /TN ""HdrTracer AutoStart"" /F"; Flags: runhidden; RunOnceId: "DelAutoStart"

@@ -326,6 +326,11 @@ public static class RawMftReader
 
     private static void ParseDataSize(byte[] record, int attrPos, ref MftFileInfo info, byte nonResident)
     {
+        // 이름 있는 $DATA 스트림(ADS, 예: 다운로드 파일의 Zone.Identifier)은
+        // 본체가 아니므로 무시한다. 안 그러면 ADS의 작은 크기가 본체 크기를 덮어쓴다.
+        // (속성 헤더 +0x09 = NameLength: 0이면 본체, >0이면 이름 있는 스트림)
+        if (attrPos + 0x09 < record.Length && record[attrPos + 0x09] != 0) return;
+
         if (nonResident == 0)
         {
             // Resident: Content가 레코드 안에 직접 있음. Content Length가 곧 파일 크기.
@@ -1068,6 +1073,9 @@ public static class RawMftReader
 
     private static void ParseDataSizeAt(byte[] data, int attrPos, ref MftFileInfo info, byte nonResident)
     {
+        // 이름 있는 $DATA 스트림(ADS)은 본체가 아니므로 무시 (ParseDataSize와 동일한 보정)
+        if (attrPos + 0x09 < data.Length && data[attrPos + 0x09] != 0) return;
+
         if (nonResident == 0)
         {
             if (attrPos + 0x14 >= data.Length) return;

@@ -34,15 +34,16 @@ public sealed class SearchEngine
         var results = new List<SearchHit>();
         if (indexes.Count == 0) return results;
 
-        var (textTokens, extFilter, extra) = ParseQuery(query);
+        var (textTokens, extFilter, patterns, extra) = ParseQuery(query);
 
         bool hasText = textTokens.Length > 0;
         bool hasExt  = extFilter.Count > 0;
+        bool hasPattern = patterns.Length > 0;
 
         // 텍스트·확장자·크기/날짜 조건이 하나도 없으면 결과 없음.
         // (제외·경로 필터만으로는 검색하지 않음 — 전체 경로 계산 비용 방지.
         //  크기/날짜는 숫자 비교라 싸므로 단독 검색 허용: 예) ">1GB")
-        if (!hasText && !hasExt && !extra.HasAttribute) return results;
+        if (!hasText && !hasExt && !hasPattern && !extra.HasAttribute) return results;
 
         bool excludeRecycle = ExcludeRecycleBin;
         bool hideHiddenSystem = HideHiddenSystemItems;
@@ -51,7 +52,7 @@ public sealed class SearchEngine
 
         Parallel.For(0, indexes.Count, i =>
         {
-            partials[i] = SearchOneIndex(indexes[i], textTokens, extFilter, extra,
+            partials[i] = SearchOneIndex(indexes[i], textTokens, extFilter, patterns, extra,
                 excludeRecycle, hideHiddenSystem);
         });
 
@@ -83,10 +84,11 @@ public sealed class SearchEngine
     /// "사진 >2026-01"       → 날짜 조건 (연-월-일 부분 표기, 연도 선행이면 . / 구분도 허용)
     /// "보고서 >week"        → 상대 날짜 (today / week / month / year)
     /// </summary>
-    private static (string[] textTokens, HashSet<string> exts, ExtraFilters extra) ParseQuery(string raw)
+    private static (string[] textTokens, HashSet<string> exts, string[] patterns, ExtraFilters extra) ParseQuery(string raw)
     {
         var exts = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var textParts    = new List<string>();
+        var patternParts = new List<string>();
         var excludeParts = new List<string>();
         var pathParts    = new List<string>();
         var extra = new ExtraFilters();
@@ -138,10 +140,15 @@ public sealed class SearchEngine
                     continue;
                 }
 
-                if (token.StartsWith("*.") && token.Length > 2)
-                    exts.Add(token.Substring(2));
-                else if (token.StartsWith(".") && token.Length > 1)
+                bool hasWild = token.IndexOf('*') >= 0 || token.IndexOf('?') >= 0;
+
+                if (token.StartsWith("*.") && token.Length > 2
+                    && token.IndexOf('*', 2) < 0 && token.IndexOf('?', 2) < 0)
+                    exts.Add(token.Substring(2));                 // 확장자 문법 (*.jpg)
+                else if (token.StartsWith(".") && token.Length > 1 && !hasWild)
                     exts.Add(token.Substring(1));
+                else if (hasWild)
+                    patternParts.Add(token);                      // 이름 와일드카드 (IMG_*_편집)
                 else
                     textParts.Add(token.ToLowerInvariant());
             }
@@ -149,7 +156,7 @@ public sealed class SearchEngine
 
         extra.ExcludeTokens = excludeParts.ToArray();
         extra.PathFilters   = pathParts.ToArray();
-        return (textParts.ToArray(), exts, extra);
+        return (textParts.ToArray(), exts, patternParts.ToArray(), extra);
     }
 
     /// <summary>공백 분리하되 "큰따옴표" 묶음은 하나의 토큰으로(따옴표 제거). 공백 포함 경로용.</summary>
@@ -296,16 +303,17 @@ public sealed class SearchEngine
     /// 텍스트 토큰이 있으면 N-gram 후보 우선, 없으면(확장자/크기/날짜만) 전체 선형 스캔.
     /// </summary>
     private static List<SearchHit> SearchOneIndex(
-        FileIndex index, string[] tokens, HashSet<string> extFilter, ExtraFilters extra,
+        FileIndex index, string[] tokens, HashSet<string> extFilter, string[] patterns, ExtraFilters extra,
         bool excludeRecycle, bool hideHiddenSystem)
     {
         var local = new List<SearchHit>(1024);
         int count = index.Count;
         bool hasText = tokens.Length > 0;
         bool hasExt  = extFilter.Count > 0;
+        bool hasPattern = patterns.Length > 0;
         bool hasExtra = extra.Any;
 
-        if (!hasText)
+        if (!hasText && !hasPattern)
         {
             // === 확장자/크기/날짜만: 전체 선형 스캔 (파일만) ===
             for (int j = 0; j < count; j++)
@@ -324,11 +332,11 @@ public sealed class SearchEngine
         }
 
         // === 텍스트 검색 (+ 선택적 필터) ===
-        int[]? candidates = TryGetCandidatesViaNgram(index, tokens);
+        int[]? candidates = TryGetCandidatesViaNgram(index, tokens, patterns);
 
         if (candidates is not null)
         {
-            bool skipMatchCheck = (tokens.Length == 1);
+            bool skipMatchCheck = (tokens.Length == 1 && !hasPattern);
             int ngramBuiltCount = index.NgramBuiltAtCount;
 
             if (skipMatchCheck)
@@ -355,6 +363,7 @@ public sealed class SearchEngine
 
                     var name = index.GetNameSpan(j);
                     if (!MatchesAll(name, tokens)) continue;
+                    if (hasPattern && !MatchesAllPatterns(name, patterns)) continue;
                     if (hasExt && !MatchesExtension(name, extFilter)) continue;
                     if (hideHiddenSystem && index.IsHiddenSystemEffective(j)) continue;
                     if (excludeRecycle && IsInRecycleBin(index, j)) continue;
@@ -370,6 +379,7 @@ public sealed class SearchEngine
 
                 var name = index.GetNameSpan(j);
                 if (!MatchesAll(name, tokens)) continue;
+                if (hasPattern && !MatchesAllPatterns(name, patterns)) continue;
                 if (hasExt && !MatchesExtension(name, extFilter)) continue;
                 if (hideHiddenSystem && index.IsHiddenSystemEffective(j)) continue;
                 if (excludeRecycle && IsInRecycleBin(index, j)) continue;
@@ -386,6 +396,7 @@ public sealed class SearchEngine
 
                 var name = index.GetNameSpan(j);
                 if (!MatchesAll(name, tokens)) continue;
+                if (hasPattern && !MatchesAllPatterns(name, patterns)) continue;
                 if (hasExt && !MatchesExtension(name, extFilter)) continue;
                 if (hideHiddenSystem && index.IsHiddenSystemEffective(j)) continue;
                 if (excludeRecycle && IsInRecycleBin(index, j)) continue;
@@ -401,13 +412,14 @@ public sealed class SearchEngine
     /// N-gram 인덱스를 사용해 후보 엔트리 인덱스 배열을 만든다.
     /// 모든 토큰이 ngram 사용 가능해야 의미 있음. 하나라도 못 쓰면 null 반환 (폴백).
     /// </summary>
-    private static int[]? TryGetCandidatesViaNgram(FileIndex index, string[] tokens)
+    private static int[]? TryGetCandidatesViaNgram(FileIndex index, string[] tokens, string[] patterns)
     {
         var ngram = index.Ngram;
         if (ngram is null) return null;
 
-        List<int[]>? perToken = null;
+        var arrays = new List<int[]>(tokens.Length + patterns.Length);
 
+        // 텍스트 토큰: 전부 ngram 사용 가능해야 (기존 동작 유지)
         foreach (var token in tokens)
         {
             var c = ngram.GetCandidates(token);
@@ -415,14 +427,28 @@ public sealed class SearchEngine
                 return null;
             if (c.Length == 0)
                 return Array.Empty<int>();
-            perToken ??= new List<int[]>(tokens.Length);
-            perToken.Add(c);
+            arrays.Add(c);
         }
 
-        if (perToken is null || perToken.Count == 0) return null;
-        if (perToken.Count == 1) return perToken[0];
+        // 패턴: * ? 로 쪼갠 글자 조각 중 ngram이 쓸 수 있는 것만 "선택적으로" 후보 축소에 활용.
+        // (조각이 짧아 ngram이 못 쓰면 건너뜀 — 그 경우 아래 폴백/선형 검사로 걸러짐)
+        foreach (var pat in patterns)
+        {
+            foreach (var frag in pat.Split('*', '?'))
+            {
+                if (frag.Length == 0) continue;
+                var c = ngram.GetCandidates(frag);
+                if (c is null) continue;
+                if (c.Length == 0)
+                    return Array.Empty<int>();   // 필수 조각이 아무 이름에도 없음 → 결과 없음
+                arrays.Add(c);
+            }
+        }
 
-        return IntersectAll(perToken);
+        if (arrays.Count == 0) return null;      // 좁힐 수단 없음 → 선형 폴백
+        if (arrays.Count == 1) return arrays[0];
+
+        return IntersectAll(arrays);
     }
 
     private static int[] IntersectAll(List<int[]> sortedArrays)
@@ -458,6 +484,50 @@ public sealed class SearchEngine
                 return false;
         }
         return true;
+    }
+
+    private static bool MatchesAllPatterns(ReadOnlySpan<char> name, string[] patterns)
+    {
+        for (int p = 0; p < patterns.Length; p++)
+        {
+            if (!MatchesPattern(name, patterns[p]))
+                return false;
+        }
+        return true;
+    }
+
+    /// <summary>
+    /// 와일드카드 전체 일치: 이름 전체가 패턴 모양과 맞아야 한다 (대소문자 무시).
+    /// '*' = 아무 글자들(0개 이상), '?' = 아무 글자 하나.
+    /// 예) "IMG_*_편집" 은 IMG_0234_편집 은 맞고 복사_IMG_1_편집 은 안 맞음.
+    /// </summary>
+    private static bool MatchesPattern(ReadOnlySpan<char> name, string pattern)
+    {
+        int n = 0, p = 0, starP = -1, starN = 0;
+        while (n < name.Length)
+        {
+            if (p < pattern.Length && (pattern[p] == '?' ||
+                char.ToUpperInvariant(pattern[p]) == char.ToUpperInvariant(name[n])))
+            {
+                p++; n++;
+            }
+            else if (p < pattern.Length && pattern[p] == '*')
+            {
+                starP = p++;      // 별 위치 기억
+                starN = n;
+            }
+            else if (starP >= 0)
+            {
+                p = starP + 1;    // 별이 글자 하나를 더 삼키게 되돌아감
+                n = ++starN;
+            }
+            else
+            {
+                return false;
+            }
+        }
+        while (p < pattern.Length && pattern[p] == '*') p++;
+        return p == pattern.Length;
     }
 
     private static bool IsInRecycleBin(FileIndex index, int entryIndex)
