@@ -50,14 +50,31 @@ public sealed class AppSettings
         try
         {
             var path = GetSettingsPath();
-            if (!File.Exists(path)) return new AppSettings();
+            if (!File.Exists(path)) return CreateDefault();
             var json = File.ReadAllText(path);
-            return JsonSerializer.Deserialize<AppSettings>(json) ?? new AppSettings();
+            return JsonSerializer.Deserialize<AppSettings>(json) ?? CreateDefault();
         }
         catch
         {
-            return new AppSettings();
+            return CreateDefault();
         }
+    }
+
+    /// <summary>
+    /// 최초 실행(설정 파일 없음/손상) 기본값: 언어를 Windows 표시 언어에 맞춘다.
+    /// 한국어 Windows면 ko, 그 외는 en. 사용자가 메뉴에서 바꾸면 그 선택이 저장·유지된다.
+    /// </summary>
+    private static AppSettings CreateDefault()
+    {
+        var s = new AppSettings();
+        try
+        {
+            s.Language = System.Globalization.CultureInfo.CurrentUICulture
+                .TwoLetterISOLanguageName.Equals("ko", StringComparison.OrdinalIgnoreCase)
+                ? "ko" : "en";
+        }
+        catch { /* 감지 실패 시 기본값(ko) 유지 */ }
+        return s;
     }
 
     public void Save()

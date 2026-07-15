@@ -2631,14 +2631,16 @@ public partial class MainWindow : Window
 
         var koItem = new MenuItem
         {
-            Header = (isKo ? "●  " : "      ") + "한국어"
+            Header = Loc.T("menu.lang.ko"),
+            IsChecked = isKo          // 현재 언어에 체크 표시 (텍스트 정렬은 자동)
         };
         koItem.Click += (_, _) => ChangeLanguage(Loc.Lang.Korean);
         langItem.Items.Add(koItem);
 
         var enItem = new MenuItem
         {
-            Header = (!isKo ? "●  " : "      ") + "English"
+            Header = Loc.T("menu.lang.en"),
+            IsChecked = !isKo
         };
         enItem.Click += (_, _) => ChangeLanguage(Loc.Lang.English);
         langItem.Items.Add(enItem);
