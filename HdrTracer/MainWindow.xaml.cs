@@ -84,9 +84,15 @@ public partial class MainWindow : Window
 
         // 저장된 설정을 검색 엔진에 반영 (기본 false → 숨김+시스템 항목 숨김)
         _engine.HideHiddenSystemItems = !_settings.ShowHiddenSystemItems;
+        _engine.ExcludedFolderNames = _settings.ExcludedFolders.ToArray();
 
         // 저장된 컬럼 너비 복원
         ApplySavedColumnWidths();
+
+        // 저장된 정렬 상태 복원 (해석 실패 시 기본값 Name/오름차순 유지)
+        if (Enum.TryParse<SortColumn>(_settings.SortColumn, out var savedSort))
+            _sortColumn = savedSort;
+        _sortAscending = _settings.SortAscending;
 
         RestoreWindowPlacement();
 
@@ -166,6 +172,17 @@ public partial class MainWindow : Window
         InputBindings.Add(new KeyBinding(
             new RelayCommand(_ => ZoomIn()),
             Key.Add, ModifierKeys.Control));        // Ctrl + 숫자패드 +
+        // 고정 검색 단축키: Ctrl+1~9 → 고정 목록의 위에서 n번째 검색을 즉시 실행
+        for (int i = 0; i < 9; i++)
+        {
+            int idx = i;   // 클로저 캡처 (루프 변수 직접 캡처 금지)
+            InputBindings.Add(new KeyBinding(
+                new RelayCommand(_ => RunPinnedSearch(idx)),
+                Key.D1 + i, ModifierKeys.Control));
+            InputBindings.Add(new KeyBinding(
+                new RelayCommand(_ => RunPinnedSearch(idx)),
+                Key.NumPad1 + i, ModifierKeys.Control));   // 숫자패드도 지원
+        }
         InputBindings.Add(new KeyBinding(
             new RelayCommand(_ => ZoomOut()),
             Key.OemMinus, ModifierKeys.Control));  // Ctrl + -
@@ -886,6 +903,18 @@ public partial class MainWindow : Window
         { }
     }
 
+    // Ctrl+1~9: 고정 검색 실행. 번호는 히스토리 팝업의 📌 목록 순서(위에서부터).
+    private void RunPinnedSearch(int index)
+    {
+        var p = _settings.PinnedSearches;
+        if (index < 0 || index >= p.Count) return;   // 그 번호에 고정 검색 없으면 무시
+
+        SearchBox.Text = p[index];
+        SearchBox.CaretIndex = SearchBox.Text.Length;
+        HistoryPopup.IsOpen = false;
+        RunSearch();
+    }
+
     private void OnIndexChanged()
     {
         Dispatcher.BeginInvoke(() =>
@@ -924,6 +953,11 @@ public partial class MainWindow : Window
             _sortColumn = newCol;
             _sortAscending = true;
         }
+
+        // 정렬 상태 저장 (재시작 시 복원)
+        _settings.SortColumn = _sortColumn.ToString();
+        _settings.SortAscending = _sortAscending;
+        _settings.Save();
 
         // 현재 검색 결과를 다시 정렬해서 표시
         if (ResultsList.ItemsSource is List<SearchResultRow> currentRows)
@@ -2841,9 +2875,10 @@ public partial class MainWindow : Window
         if (result == true)
         {
             // 숨김+시스템 표시 토글 반영 (엔진에 적용 후 재검색)
-            if (dlg.HiddenSystemChanged)
+            if (dlg.HiddenSystemChanged || dlg.ExcludedChanged)
             {
                 _engine.HideHiddenSystemItems = !_settings.ShowHiddenSystemItems;
+                _engine.ExcludedFolderNames = _settings.ExcludedFolders.ToArray();
                 if (!string.IsNullOrEmpty(_lastSearchQuery))
                 {
                     if (SearchBox.Text != _lastSearchQuery)
@@ -2880,7 +2915,10 @@ public partial class MainWindow : Window
                 UpdateFooterSummary();
             }
 
-            if (!string.IsNullOrEmpty(_lastSearchQuery) && SearchBox.Text == _lastSearchQuery)
+            // 검색창에 검색어가 있으면 무조건 목록 갱신.
+            // (_lastSearchQuery 일치 조건은 껐다 켠 직후 상태에 따라 어긋나
+            //  인덱싱은 되는데 목록이 안 바뀌는 문제가 있었음 — USB 도착/제거 경로와 동일한 처방)
+            if (!string.IsNullOrEmpty(SearchBox.Text))
                 RunSearch();
         }
         else
@@ -2896,7 +2934,10 @@ public partial class MainWindow : Window
             }
             UpdateFooterSummary();
 
-            if (!string.IsNullOrEmpty(_lastSearchQuery) && SearchBox.Text == _lastSearchQuery)
+            // 검색창에 검색어가 있으면 무조건 목록 갱신.
+            // (_lastSearchQuery 일치 조건은 껐다 켠 직후 상태에 따라 어긋나
+            //  인덱싱은 되는데 목록이 안 바뀌는 문제가 있었음 — USB 도착/제거 경로와 동일한 처방)
+            if (!string.IsNullOrEmpty(SearchBox.Text))
                 RunSearch();
         }
     }

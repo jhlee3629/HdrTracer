@@ -100,6 +100,7 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                     </Grid.RowDefinitions>
 
                     <TextBlock Grid.Row="0" Grid.Column="0" Text="Ctrl + L" Foreground="#DDDDDD" FontFamily="Consolas" Margin="0,2"/>
@@ -110,6 +111,9 @@
 
                     <TextBlock Grid.Row="2" Grid.Column="0" Text="↓" Foreground="#DDDDDD" FontFamily="Consolas" Margin="0,2"/>
                     <TextBlock Grid.Row="2" Grid.Column="1" x:Name="RowGotoResults" Text="결과 리스트로 이동" Foreground="#CCCCCC" Margin="0,2"/>
+
+                    <TextBlock Grid.Row="3" Grid.Column="0" Text="Ctrl + 1~9" Foreground="#DDDDDD" FontFamily="Consolas" Margin="0,2"/>
+                    <TextBlock Grid.Row="3" Grid.Column="1" x:Name="RowPinnedSearch" Text="고정 검색 실행 (📌 위에서부터 1~9)" Foreground="#CCCCCC" Margin="0,2"/>
                 </Grid>
 
                 <TextBlock x:Name="SecResultList" Text="결과 리스트"

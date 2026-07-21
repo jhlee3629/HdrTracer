@@ -13,6 +13,13 @@ public sealed class SearchEngine
     /// </summary>
     public bool HideHiddenSystemItems { get; set; } = true;
 
+    /// <summary>
+    /// 검색 결과에서 숨길 폴더 "이름" 목록 (예: WinSxS, node_modules).
+    /// 이 이름의 폴더 자신과 그 안의 모든 항목이 결과에서 제외된다.
+    /// 이름 기준 조상 순회라 경로 문자열을 만들지 않아 빠르다. (인덱스 자체는 유지 → 즉시 반영)
+    /// </summary>
+    public string[] ExcludedFolderNames { get; set; } = Array.Empty<string>();
+
     /// <summary>추가 필터 묶음: 제외 단어/확장자, 경로, 크기, 수정 날짜.</summary>
     private sealed class ExtraFilters
     {
@@ -47,13 +54,14 @@ public sealed class SearchEngine
 
         bool excludeRecycle = ExcludeRecycleBin;
         bool hideHiddenSystem = HideHiddenSystemItems;
+        var excludedNames = ExcludedFolderNames;
 
         var partials = new List<SearchHit>[indexes.Count];
 
         Parallel.For(0, indexes.Count, i =>
         {
             partials[i] = SearchOneIndex(indexes[i], textTokens, extFilter, patterns, extra,
-                excludeRecycle, hideHiddenSystem);
+                excludedNames, excludeRecycle, hideHiddenSystem);
         });
 
         int total = 0;
@@ -304,9 +312,10 @@ public sealed class SearchEngine
     /// </summary>
     private static List<SearchHit> SearchOneIndex(
         FileIndex index, string[] tokens, HashSet<string> extFilter, string[] patterns, ExtraFilters extra,
-        bool excludeRecycle, bool hideHiddenSystem)
+        string[] excludedNames, bool excludeRecycle, bool hideHiddenSystem)
     {
         var local = new List<SearchHit>(1024);
+        bool hasExcludedDir = excludedNames.Length > 0;
         int count = index.Count;
         bool hasText = tokens.Length > 0;
         bool hasExt  = extFilter.Count > 0;
@@ -325,6 +334,7 @@ public sealed class SearchEngine
                 if (hasExt && !MatchesExtension(name, extFilter)) continue;
                 if (hideHiddenSystem && index.IsHiddenSystemEffective(j)) continue;
                 if (excludeRecycle && IsInRecycleBin(index, j)) continue;
+                if (hasExcludedDir && IsInExcludedFolder(index, j, excludedNames)) continue;
                 if (hasExtra && !PassesExtraFilters(index, j, name, extra)) continue;
                 local.Add(new SearchHit(index, j));
             }
@@ -350,6 +360,7 @@ public sealed class SearchEngine
                     if (hasExt && !MatchesExtension(name, extFilter)) continue;
                     if (hideHiddenSystem && index.IsHiddenSystemEffective(j)) continue;
                     if (excludeRecycle && IsInRecycleBin(index, j)) continue;
+                    if (hasExcludedDir && IsInExcludedFolder(index, j, excludedNames)) continue;
                     if (hasExtra && !PassesExtraFilters(index, j, name, extra)) continue;
                     local.Add(new SearchHit(index, j));
                 }
@@ -367,6 +378,7 @@ public sealed class SearchEngine
                     if (hasExt && !MatchesExtension(name, extFilter)) continue;
                     if (hideHiddenSystem && index.IsHiddenSystemEffective(j)) continue;
                     if (excludeRecycle && IsInRecycleBin(index, j)) continue;
+                    if (hasExcludedDir && IsInExcludedFolder(index, j, excludedNames)) continue;
                     if (hasExtra && !PassesExtraFilters(index, j, name, extra)) continue;
                     local.Add(new SearchHit(index, j));
                 }
@@ -383,6 +395,7 @@ public sealed class SearchEngine
                 if (hasExt && !MatchesExtension(name, extFilter)) continue;
                 if (hideHiddenSystem && index.IsHiddenSystemEffective(j)) continue;
                 if (excludeRecycle && IsInRecycleBin(index, j)) continue;
+                if (hasExcludedDir && IsInExcludedFolder(index, j, excludedNames)) continue;
                 if (hasExtra && !PassesExtraFilters(index, j, name, extra)) continue;
                 local.Add(new SearchHit(index, j));
             }
@@ -400,6 +413,7 @@ public sealed class SearchEngine
                 if (hasExt && !MatchesExtension(name, extFilter)) continue;
                 if (hideHiddenSystem && index.IsHiddenSystemEffective(j)) continue;
                 if (excludeRecycle && IsInRecycleBin(index, j)) continue;
+                if (hasExcludedDir && IsInExcludedFolder(index, j, excludedNames)) continue;
                 if (hasExtra && !PassesExtraFilters(index, j, name, extra)) continue;
                 local.Add(new SearchHit(index, j));
             }
@@ -528,6 +542,23 @@ public sealed class SearchEngine
         }
         while (p < pattern.Length && pattern[p] == '*') p++;
         return p == pattern.Length;
+    }
+
+    /// <summary>자기 자신 또는 조상 폴더의 이름이 제외 목록에 있으면 true (대소문자 무시).</summary>
+    private static bool IsInExcludedFolder(FileIndex index, int entryIndex, string[] excludedNames)
+    {
+        int cur = entryIndex;
+        for (int depth = 0; depth < 64 && cur >= 0; depth++)
+        {
+            var name = index.GetNameSpan(cur);
+            for (int k = 0; k < excludedNames.Length; k++)
+            {
+                if (name.Equals(excludedNames[k], StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+            cur = index.GetParentIndex(cur);
+        }
+        return false;
     }
 
     private static bool IsInRecycleBin(FileIndex index, int entryIndex)

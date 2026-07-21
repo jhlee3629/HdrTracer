@@ -21,6 +21,13 @@ public sealed class AppSettings
     public List<string> SearchHistory { get; set; } = new();
     public List<string> PinnedSearches { get; set; } = new();
 
+    /// <summary>검색 결과에서 숨길 폴더 이름 목록 (예: WinSxS, node_modules)</summary>
+    public List<string> ExcludedFolders { get; set; } = new();
+
+    /// <summary>결과 정렬 상태 (컬럼 이름 문자열 + 오름차순 여부)</summary>
+    public string SortColumn { get; set; } = "Name";
+    public bool SortAscending { get; set; } = true;
+
     /// <summary>컬럼 너비(픽셀). 경로는 * 채움이라 저장 안 함. 0 이하면 기본값 사용.
     /// 기본값은 XAML 디자인값과 동일.</summary>
     public double ColWidthDrive { get; set; } = 50;

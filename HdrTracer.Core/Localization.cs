@@ -146,6 +146,8 @@ public static class Localization
         ["settings.autostart"]      = "Windows 시작 시 자동 실행",
         ["settings.autostart.desc"] = "로그인하면 트레이에 자동으로 실행됩니다. (작업 스케줄러 등록, UAC 없음)",
         ["settings.autostart.fail"] = "자동 실행 설정 변경에 실패했습니다.",
+        ["settings.excluded"]      = "검색에서 제외할 폴더 이름",
+        ["settings.excluded.desc"] = "세미콜론(;)으로 구분. 이 이름의 폴더와 그 안의 모든 항목이 결과에서 숨겨집니다. 예: WinSxS; node_modules",
 
         // 단축키 창
         ["sc.title"]        = "단축키",
@@ -156,6 +158,7 @@ public static class Localization
         ["sc.zoomOut"]      = "축소",
         ["sc.zoomReset"]    = "배율 초기화",
         ["sc.searchBox"]    = "검색창",
+        ["sc.pinnedSearch"] = "고정 검색 실행 (📌 위에서부터 1~9)",
         ["sc.focusSearch"]  = "검색창에 포커스",
         ["sc.clearSearch"]  = "검색어 지우기",
         ["sc.gotoResults"]  = "결과 리스트로 이동",
@@ -339,6 +342,8 @@ public static class Localization
         ["settings.autostart"]      = "Start with Windows",
         ["settings.autostart.desc"] = "Runs in the tray automatically at sign-in (Task Scheduler, no UAC prompt).",
         ["settings.autostart.fail"] = "Failed to change the auto-start setting.",
+        ["settings.excluded"]      = "Folder names to exclude from search",
+        ["settings.excluded.desc"] = "Separate with semicolons (;). Folders with these names — and everything inside them — are hidden from results. e.g. WinSxS; node_modules",
 
         // Shortcuts window
         ["sc.title"]        = "Shortcuts",
@@ -349,6 +354,7 @@ public static class Localization
         ["sc.zoomOut"]      = "Zoom Out",
         ["sc.zoomReset"]    = "Reset Zoom",
         ["sc.searchBox"]    = "Search Box",
+        ["sc.pinnedSearch"] = "Run pinned search (1–9 from top)",
         ["sc.focusSearch"]  = "Focus search box",
         ["sc.clearSearch"]  = "Clear search",
         ["sc.gotoResults"]  = "Move to result list",

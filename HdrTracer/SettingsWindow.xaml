@@ -76,6 +76,7 @@
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
             <TextBlock Grid.Row="0"
@@ -177,7 +178,27 @@
                         FocusVisualStyle="{StaticResource BrightFocusVisual}"/>
             </Grid>
 
-            <TextBlock Grid.Row="5"
+            <!-- 검색 제외 폴더 이름 -->
+            <StackPanel Grid.Row="5" Margin="0,16,0,0">
+                <TextBlock x:Name="ExcludedTitle" Text="검색에서 제외할 폴더 이름"
+                        Foreground="White"
+                        FontSize="13"/>
+                <TextBlock x:Name="ExcludedDesc" Text="세미콜론(;)으로 구분. 이 이름의 폴더와 그 안의 모든 항목이 결과에서 숨겨집니다. 예: WinSxS; node_modules"
+                        Foreground="#888"
+                        FontSize="11"
+                        Margin="0,2,0,6"
+                        TextWrapping="Wrap"/>
+                <TextBox x:Name="ExcludedBox"
+                        Background="#1E1E1E"
+                        Foreground="#F1F1F1"
+                        BorderBrush="#3E3E42"
+                        BorderThickness="1"
+                        CaretBrush="#F1F1F1"
+                        Padding="6,4"
+                        FontSize="13"/>
+            </StackPanel>
+
+            <TextBlock Grid.Row="6"
                     x:Name="StatusText"
                     Foreground="#7CB7FF"
                     FontSize="11"

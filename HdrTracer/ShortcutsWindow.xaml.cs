@@ -36,6 +36,7 @@ public partial class ShortcutsWindow : Window
         RowFocusSearch.Text = Loc.T("sc.focusSearch");
         RowClearSearch.Text = Loc.T("sc.clearSearch");
         RowGotoResults.Text = Loc.T("sc.gotoResults");
+        RowPinnedSearch.Text = Loc.T("sc.pinnedSearch");
 
         SecResultList.Text  = Loc.T("sc.resultList");
         RowOpenItem1.Text   = Loc.T("sc.openItem");
