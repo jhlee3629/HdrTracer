@@ -217,27 +217,38 @@ public partial class MainWindow : Window
         var src = (HwndSource)PresentationSource.FromVisual(this)!;
         _watcher.AttachTo(src);
 
-        // 글로벌 단축키 등록 (Win + Alt + S)
+        // 글로벌 단축키 (Win + Alt + S) — 설정에서 켠 경우에만 등록 (기본 켜짐)
+        if (_settings.GlobalHotkeyEnabled)
+            RegisterGlobalHotkey();
+    }
+
+    /// <summary>전역 단축키(Win+Alt+S)를 등록. 실패하면(다른 앱과 충돌 등) 하단에 안내.</summary>
+    private void RegisterGlobalHotkey()
+    {
         try
         {
-            _globalHotkey = new GlobalHotkey(this);
-            _globalHotkey.Pressed += (_, _) => ToggleVisibility();
+            if (_globalHotkey is null)
+            {
+                _globalHotkey = new GlobalHotkey(this);
+                _globalHotkey.Pressed += (_, _) => ToggleVisibility();
+            }
 
-            // S 키 = virtual key 0x53
             bool ok = _globalHotkey.Register(
                 GlobalHotkey.Modifiers.Win | GlobalHotkey.Modifiers.Alt,
-                0x53);
+                0x53);   // S
 
             if (!ok)
-            {
-                // 다른 앱이 같은 단축키를 이미 등록했을 수 있음
-                System.Diagnostics.Debug.WriteLine("글로벌 단축키 등록 실패: 다른 앱과 충돌");
-            }
+                ShowFooterNotice(Loc.T("hotkey.fail"));
         }
-        catch (Exception ex)
+        catch
         {
-            System.Diagnostics.Debug.WriteLine($"글로벌 단축키 초기화 실패: {ex.Message}");
+            ShowFooterNotice(Loc.T("hotkey.fail"));
         }
+    }
+
+    private void UnregisterGlobalHotkey()
+    {
+        try { _globalHotkey?.Unregister(); } catch { /* 무시 */ }
     }
 
     private void ToggleVisibility()
@@ -318,6 +329,19 @@ public partial class MainWindow : Window
         try
         {
             _trayIcon = new TrayIconHelper(this);
+
+            // 트레이 메뉴: 고정 검색 목록 공급 + 항목 클릭 시 소환·실행, 설정 열기
+            _trayIcon.PinnedSearchesProvider = () => _settings.PinnedSearches;
+            _trayIcon.PinnedSearchRequested += (_, idx) =>
+            {
+                _trayIcon.ShowWindow();
+                RunPinnedSearch(idx);
+            };
+            _trayIcon.SettingsRequested += (_, _) =>
+            {
+                _trayIcon.ShowWindow();
+                SettingsButton_Click(this, new RoutedEventArgs());
+            };
             _trayIcon.ExitRequested += (_, _) =>
             {
                 _reallyClose = true;
@@ -927,7 +951,7 @@ public partial class MainWindow : Window
     // ==================================================
     //  컬럼 정렬
     // ==================================================
-    private void HeaderButton_Click(object sender, RoutedEventArgs e)
+    private async void HeaderButton_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not Button btn || btn.Tag is not string tag) return;
 
@@ -942,7 +966,9 @@ public partial class MainWindow : Window
             _ => SortColumn.Name
         };
 
-        if (newCol == _sortColumn)
+        bool sameColumnToggle = (newCol == _sortColumn);   // 같은 컬럼 재클릭 = 방향만 반전
+
+        if (sameColumnToggle)
         {
             // 같은 컬럼 다시 클릭 → 정렬 방향 토글
             _sortAscending = !_sortAscending;
@@ -959,11 +985,33 @@ public partial class MainWindow : Window
         _settings.SortAscending = _sortAscending;
         _settings.Save();
 
-        // 현재 검색 결과를 다시 정렬해서 표시
+        // 현재 검색 결과를 다시 정렬해서 표시.
         if (ResultsList.ItemsSource is List<SearchResultRow> currentRows)
         {
-            var sorted = SortRows(currentRows);
-            ResultsList.ItemsSource = sorted;
+            if (sameColumnToggle)
+            {
+                // 같은 컬럼 방향 반전: 이미 그 컬럼으로 정렬돼 있으니
+                // 뒤집기만 한다 (수십만 건도 즉시)
+                var reversed = new List<SearchResultRow>(currentRows.Count);
+                for (int i = currentRows.Count - 1; i >= 0; i--)
+                    reversed.Add(currentRows[i]);
+                ResultsList.ItemsSource = reversed;
+            }
+            else
+            {
+                // 다른 컬럼: 결과가 수십만 건이면 정렬에 수백 ms가 걸릴 수 있어,
+                // 검색 경로(RunSearch)와 동일하게 백그라운드에서 정렬 (UI 멈춤 방지)
+                System.Windows.Input.Mouse.OverrideCursor = System.Windows.Input.Cursors.Wait;
+                try
+                {
+                    var sorted = await Task.Run(() => SortRows(currentRows));
+                    ResultsList.ItemsSource = sorted;
+                }
+                finally
+                {
+                    System.Windows.Input.Mouse.OverrideCursor = null;
+                }
+            }
         }
     }
 
@@ -1362,10 +1410,22 @@ public partial class MainWindow : Window
     // 검색창에서 ↓ 누르면 결과 리스트로 포커스 이동
     private void SearchBox_KeyDown(object sender, KeyEventArgs e)
     {
-        // Esc: 히스토리가 떠 있으면 닫기 (그 외엔 기존 동작에 맡김)
-        if (e.Key == Key.Escape && HistoryPopup.IsOpen)
+        // Esc 단계 동작: ① 히스토리 팝업 닫기 → ② 검색어 지우기 → ③ 트레이로 숨기기
+        if (e.Key == Key.Escape)
         {
-            HistoryPopup.IsOpen = false;
+            if (HistoryPopup.IsOpen)
+            {
+                HistoryPopup.IsOpen = false;
+            }
+            else if (!string.IsNullOrEmpty(SearchBox.Text))
+            {
+                SearchBox.Clear();
+                RunSearch();          // 빈 검색 상태로 정리 (목록 비움 + 드라이브 요약)
+            }
+            else
+            {
+                _trayIcon?.HideWindow();
+            }
             e.Handled = true;
             return;
         }
@@ -1559,6 +1619,17 @@ public partial class MainWindow : Window
 
     private void ResultsList_KeyDown(object sender, KeyEventArgs e)
     {
+        // Esc 단계 동작 (결과 목록): 한 겹만 빠져나온다 —
+        // 선택(강조) 해제 + 검색창으로 포커스 복귀. (하단 선택 요약도 함께 원복됨)
+        // (다음 Esc부터는 검색창 쪽 단계 동작: 검색어 지우기 → 트레이로)
+        if (e.Key == Key.Escape)
+        {
+            ResultsList.UnselectAll();
+            SearchBox.Focus();
+            e.Handled = true;
+            return;
+        }
+
         // Del — 휴지통으로 삭제
         if (e.Key == Key.Delete
             && (Keyboard.Modifiers & ModifierKeys.Control) == 0
@@ -2333,11 +2404,14 @@ public partial class MainWindow : Window
         string win  = Environment.GetFolderPath(Environment.SpecialFolder.Windows).TrimEnd('\\');
         string pf   = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles).TrimEnd('\\');
         string pf86 = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86).TrimEnd('\\');
+        string progData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData).TrimEnd('\\');
         string users = Path.Combine(Path.GetPathRoot(win) ?? "C:\\", "Users").TrimEnd('\\');
         string userHome = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile).TrimEnd('\\');
 
-        // Windows / Program Files: 폴더 자체와 그 하위 전체를 위험으로 본다
-        if (StartsWithDir(p, win) || StartsWithDir(p, pf) || StartsWithDir(p, pf86)) return true;
+        // Windows / Program Files / ProgramData: 폴더 자체와 그 하위 전체를 위험으로 본다
+        // (ProgramData는 모든 앱의 공유 데이터 + OS 구성 요소(컨테이너 레이어 등)가 있는 곳)
+        if (StartsWithDir(p, win) || StartsWithDir(p, pf) || StartsWithDir(p, pf86)
+            || StartsWithDir(p, progData)) return true;
 
         // Users 폴더 자체, 각 사용자 홈 폴더 자체는 위험. 단 그 "안"의 항목은 허용.
         if (p.Equals(users, StringComparison.OrdinalIgnoreCase)) return true;
@@ -2875,6 +2949,13 @@ public partial class MainWindow : Window
         if (result == true)
         {
             // 숨김+시스템 표시 토글 반영 (엔진에 적용 후 재검색)
+            // 전역 단축키 토글 반영
+            if (dlg.HotkeyChanged)
+            {
+                if (_settings.GlobalHotkeyEnabled) RegisterGlobalHotkey();
+                else UnregisterGlobalHotkey();
+            }
+
             if (dlg.HiddenSystemChanged || dlg.ExcludedChanged)
             {
                 _engine.HideHiddenSystemItems = !_settings.ShowHiddenSystemItems;

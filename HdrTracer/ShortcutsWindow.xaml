@@ -67,6 +67,7 @@
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
 
                         <TextBlock Grid.Row="0" Grid.Column="0" Text="Ctrl + ," Foreground="#DDDDDD" FontFamily="Consolas" Margin="0,2"/>
@@ -83,6 +84,9 @@
 
                         <TextBlock Grid.Row="4" Grid.Column="0" Text="Ctrl + 0" Foreground="#DDDDDD" FontFamily="Consolas" Margin="0,2"/>
                         <TextBlock Grid.Row="4" Grid.Column="1" x:Name="RowZoomReset" Text="배율 초기화" Foreground="#CCCCCC" Margin="0,2"/>
+
+                        <TextBlock Grid.Row="5" Grid.Column="0" Text="Win + Alt + S" Foreground="#DDDDDD" FontFamily="Consolas" Margin="0,2"/>
+                        <TextBlock Grid.Row="5" Grid.Column="1" x:Name="RowGlobalHotkey" Text="창 불러오기 / 숨기기 (다른 앱 사용 중에도)" Foreground="#CCCCCC" Margin="0,2"/>
                     </Grid>
 
                 <TextBlock x:Name="SecSearchBox" Text="검색창"

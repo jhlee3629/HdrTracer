@@ -6,7 +6,7 @@
 ; ============================================================
 
 #define MyAppName "HdrTracer"
-#define MyAppVersion "1.0.8"
+#define MyAppVersion "1.0.9"
 #define MyAppPublisher "HdrTracer"
 #define MyAppExeName "HdrTracer.exe"
 

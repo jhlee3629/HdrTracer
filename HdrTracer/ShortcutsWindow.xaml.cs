@@ -31,6 +31,7 @@ public partial class ShortcutsWindow : Window
         RowZoomIn.Text      = Loc.T("sc.zoomIn");
         RowZoomOut.Text     = Loc.T("sc.zoomOut");
         RowZoomReset.Text   = Loc.T("sc.zoomReset");
+        RowGlobalHotkey.Text = Loc.T("sc.globalHotkey");
 
         SecSearchBox.Text   = Loc.T("sc.searchBox");
         RowFocusSearch.Text = Loc.T("sc.focusSearch");

@@ -130,6 +130,9 @@ public static class Localization
         // 트레이
         ["tray.open"] = "HdrTracer 열기",
         ["tray.exit"] = "종료",
+        ["tray.pinned"]       = "고정 검색",
+        ["tray.pinned.empty"] = "고정된 검색 없음",
+        ["tray.settings"]     = "설정",
 
         // 설정 창
         ["settings.title"]      = "설정",
@@ -148,6 +151,10 @@ public static class Localization
         ["settings.autostart.fail"] = "자동 실행 설정 변경에 실패했습니다.",
         ["settings.excluded"]      = "검색에서 제외할 폴더 이름",
         ["settings.excluded.desc"] = "세미콜론(;)으로 구분. 이 이름의 폴더와 그 안의 모든 항목이 결과에서 숨겨집니다. 예: WinSxS; node_modules",
+        ["settings.hotkey"]      = "Global hotkey (Win+Alt+S)",
+        ["settings.hotkey"]      = "전역 단축키 (Win+Alt+S)",
+        ["settings.hotkey.desc"] = "어떤 앱을 쓰는 중에도 Win+Alt+S로 창을 불러오고, 다시 누르면 트레이로 숨깁니다.",
+        ["hotkey.fail"]          = "전역 단축키(Win+Alt+S) 등록 실패 — 다른 프로그램이 이 키를 사용 중일 수 있습니다.",
 
         // 단축키 창
         ["sc.title"]        = "단축키",
@@ -176,6 +183,7 @@ public static class Localization
         ["sc.searchTips"]   = "검색 팁",
         ["sc.tip1"]         = "여러 단어를 공백으로 구분하면 모두 포함하는 결과를 찾습니다 (AND 검색).",
         ["sc.tip2"]         = "한글은 2글자, 영문은 3글자 이상부터 빠른 N-gram 검색이 동작합니다.",
+        ["sc.globalHotkey"]      = "창 불러오기 / 숨기기 (다른 앱 사용 중에도)",
 
         ["help.search.title"] = "검색 도움말",
         ["help.search.body"] =
@@ -326,6 +334,9 @@ public static class Localization
         // Tray
         ["tray.open"] = "Open HdrTracer",
         ["tray.exit"] = "Exit",
+        ["tray.pinned"]       = "Pinned searches",
+        ["tray.pinned.empty"] = "No pinned searches",
+        ["tray.settings"]     = "Settings",
 
         // Settings window
         ["settings.title"]      = "Settings",
@@ -344,6 +355,9 @@ public static class Localization
         ["settings.autostart.fail"] = "Failed to change the auto-start setting.",
         ["settings.excluded"]      = "Folder names to exclude from search",
         ["settings.excluded.desc"] = "Separate with semicolons (;). Folders with these names — and everything inside them — are hidden from results. e.g. WinSxS; node_modules",
+        ["settings.hotkey"]      = "Global hotkey (Win+Alt+S)",
+        ["settings.hotkey.desc"] = "Summon the window from any app with Win+Alt+S; press again to hide to tray.",
+        ["hotkey.fail"]          = "Failed to register the global hotkey (Win+Alt+S) — another program may be using it.",
 
         // Shortcuts window
         ["sc.title"]        = "Shortcuts",
@@ -372,6 +386,7 @@ public static class Localization
         ["sc.searchTips"]   = "Search Tips",
         ["sc.tip1"]         = "Separate multiple words with spaces to find results containing all of them (AND search).",
         ["sc.tip2"]         = "Fast N-gram search works for 2+ Korean characters or 3+ English characters.",
+        ["sc.globalHotkey"]      = "Show / hide the window (works from any app)",
 
         ["menu.searchHelp"] = "Search help",
         ["help.search.title"] = "Search Help",

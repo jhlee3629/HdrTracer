@@ -21,6 +21,7 @@ A fast file search tool for Windows that finds files on NTFS drives by name.
 - Excluded folders — hide system-ish folders like WinSxS or node_modules from results
 - Remembers your window size & position, column widths, and sort order
 - Lives in the tray + optional "Start with Windows" (via Task Scheduler — no UAC prompt at sign-in, off by default)
+- Global hotkey `Win + Alt + S` — summon the window from any app, press again to hide to tray (can be disabled in Settings)
 - Dark theme, Korean / English support (first run follows your Windows display language)
 
 ## Requirements

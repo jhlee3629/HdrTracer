@@ -14,6 +14,10 @@ public partial class SettingsWindow : Window
     private readonly bool _initialShowHidden;
     private readonly bool _initialAutoStart;
     private readonly string _initialExcluded;
+    private readonly bool _initialHotkey;
+
+    /// <summary>전역 단축키 토글이 바뀌었는지 (호출측이 등록/해제에 사용)</summary>
+    public bool HotkeyChanged { get; private set; }
 
     /// <summary>제외 폴더 목록이 바뀌었는지 (호출측이 엔진 반영·재검색에 사용)</summary>
     public bool ExcludedChanged { get; private set; }
@@ -29,6 +33,8 @@ public partial class SettingsWindow : Window
         AutoStartCheckBox.IsChecked = _initialAutoStart;
         ExcludedBox.Text = string.Join("; ", settings.ExcludedFolders);
         _initialExcluded = NormalizeExcluded(ExcludedBox.Text);
+        _initialHotkey = settings.GlobalHotkeyEnabled;
+        HotkeyCheckBox.IsChecked = _initialHotkey;
         TrayCheckBox.IsChecked = settings.MinimizeToTrayOnClose;
         HiddenSystemCheckBox.IsChecked = settings.ShowHiddenSystemItems;
 
@@ -66,6 +72,8 @@ public partial class SettingsWindow : Window
         AutoStartDesc.Text  = Loc.T("settings.autostart.desc");
         ExcludedTitle.Text  = Loc.T("settings.excluded");
         ExcludedDesc.Text   = Loc.T("settings.excluded.desc");
+        HotkeyTitle.Text    = Loc.T("settings.hotkey");
+        HotkeyDesc.Text     = Loc.T("settings.hotkey.desc");
         OkButton.Content = Loc.T("settings.ok");
     }
 
@@ -120,6 +128,10 @@ public partial class SettingsWindow : Window
         }
         Settings.ExcludedFolders = excluded;
         ExcludedChanged = NormalizeExcluded(ExcludedBox.Text) != _initialExcluded;
+
+        bool hk = HotkeyCheckBox.IsChecked ?? false;
+        HotkeyChanged = hk != _initialHotkey;
+        Settings.GlobalHotkeyEnabled = hk;
 
         Settings.Save();
 

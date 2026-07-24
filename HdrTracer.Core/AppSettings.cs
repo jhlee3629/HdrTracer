@@ -21,6 +21,9 @@ public sealed class AppSettings
     public List<string> SearchHistory { get; set; } = new();
     public List<string> PinnedSearches { get; set; } = new();
 
+    /// <summary>전역 단축키(Win+Alt+S) 사용 여부. 기본 켜짐(기존 동작 유지).</summary>
+    public bool GlobalHotkeyEnabled { get; set; } = true;
+
     /// <summary>검색 결과에서 숨길 폴더 이름 목록 (예: WinSxS, node_modules)</summary>
     public List<string> ExcludedFolders { get; set; } = new();
 
