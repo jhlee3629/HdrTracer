@@ -297,7 +297,6 @@ public partial class MainWindow : Window
             return;
         }
 
-        StatusText.Text = $"드라이브 {drives.Count}개 인덱싱 중: {string.Join(", ", drives)} ...";
         FooterText.Text = "인덱스 빌드 중";
 
         foreach (var d in drives)
@@ -305,8 +304,10 @@ public partial class MainWindow : Window
 
         var totalSw = Stopwatch.StartNew();
 
+        StartIndexingProgress();   // 1초마다 경과·드라이브별 상태 표시
         var tasks = _multi.Slots.Select(slot => Task.Run(() => BuildOneDrive(slot))).ToArray();
         await Task.WhenAll(tasks);
+        StopIndexingProgress();
         totalSw.Stop();
 
         // 모니터 시작
@@ -366,6 +367,50 @@ public partial class MainWindow : Window
             SearchBox.Focus();
             Keyboard.Focus(SearchBox);
         }), System.Windows.Threading.DispatcherPriority.Input);
+    }
+
+    // ── 인덱싱 진행 표시 ──────────────────────────────
+    // 인덱싱은 드라이브 크기·파일 수에 따라 수 초~수십 초가 걸린다.
+    // 그동안 "멈춘 것"처럼 보이지 않도록 1초마다 경과 시간과 드라이브별 상태를 갱신한다.
+    private System.Windows.Threading.DispatcherTimer? _indexProgressTimer;
+    private Stopwatch? _indexProgressSw;
+
+    private void StartIndexingProgress()
+    {
+        StopIndexingProgress();
+        _indexProgressSw = Stopwatch.StartNew();
+        _indexProgressTimer = new System.Windows.Threading.DispatcherTimer
+        {
+            Interval = TimeSpan.FromSeconds(1)
+        };
+        _indexProgressTimer.Tick += (_, _) => UpdateIndexingProgress();
+        _indexProgressTimer.Start();
+        UpdateIndexingProgress();
+    }
+
+    private void UpdateIndexingProgress()
+    {
+        if (_indexProgressSw is null) return;
+
+        var parts = new List<string>();
+        foreach (var slot in _multi.Slots)
+        {
+            var idx = slot.Index;
+            parts.Add(idx is not null
+                ? string.Format(Loc.T("status.driveDone"), slot.DriveLetter, idx.Count)
+                : string.Format(Loc.T("status.driveWorking"), slot.DriveLetter));
+        }
+
+        StatusText.Text = string.Format(Loc.T("status.indexingProgress"),
+            (int)_indexProgressSw.Elapsed.TotalSeconds,
+            string.Join("  ·  ", parts));
+    }
+
+    private void StopIndexingProgress()
+    {
+        _indexProgressTimer?.Stop();
+        _indexProgressTimer = null;
+        _indexProgressSw = null;
     }
 
     private void BuildOneDrive(MultiDriveIndex.DriveSlot slot)
@@ -643,6 +688,28 @@ public partial class MainWindow : Window
 
     // 크기/날짜 조건 토큰을 검색창에 넣는다. 같은 종류의 기존 조건은 교체, token이 null이면 제거만.
     // (조건 토큰 구분: '>' 또는 '<'로 시작하고, 끝이 B/KB/MB/GB/TB면 크기, 아니면 날짜)
+    // 폴더만/파일만 토큰(folder: / file:)을 검색창에 넣는다. token이 null이면 제거만.
+    private void ApplyKindFilter(string? token)
+    {
+        var kept = SplitQueryTokens(SearchBox.Text)
+            .Where(t => !t.Equals("folder:", StringComparison.OrdinalIgnoreCase)
+                     && !t.Equals("dir:", StringComparison.OrdinalIgnoreCase)
+                     && !t.Equals("file:", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+
+        // SplitQueryTokens가 따옴표를 벗기므로, 공백 포함 토큰(경로)은 따옴표 복원
+        for (int i = 0; i < kept.Count; i++)
+            if (kept[i].Contains(' ')) kept[i] = "\"" + kept[i] + "\"";
+
+        if (token != null) kept.Add(token);
+
+        SearchBox.Text = string.Join(" ", kept);
+        SearchBox.CaretIndex = SearchBox.Text.Length;
+        SearchBox.Focus();
+        HistoryPopup.IsOpen = false;
+        RunSearch();
+    }
+
     private void ApplyAttrFilter(bool isSize, string? token)
     {
         var kept = SplitQueryTokens(SearchBox.Text)
@@ -2721,6 +2788,20 @@ public partial class MainWindow : Window
         AddDate("filter.clear", null);
         filterItem.Items.Add(dateItem);
 
+        // 종류 (폴더만 / 파일만)
+        var kindItem = new MenuItem { Header = Loc.T("filter.kind") };
+        void AddKind(string locKey, string? token)
+        {
+            var mi = new MenuItem { Header = Loc.T(locKey) };
+            mi.Click += (_, _) => ApplyKindFilter(token);
+            kindItem.Items.Add(mi);
+        }
+        AddKind("filter.kind.folder", "folder:");
+        AddKind("filter.kind.file",   "file:");
+        kindItem.Items.Add(new Separator());
+        AddKind("filter.clear", null);
+        filterItem.Items.Add(kindItem);
+
         menu.Items.Add(filterItem);
 
         menu.Items.Add(new Separator());
@@ -2897,8 +2978,10 @@ public partial class MainWindow : Window
             UpdateFooterSummary();
 
             var sw = Stopwatch.StartNew();
+            StartIndexingProgress();   // 1초마다 경과·드라이브별 상태 표시
             var tasks = _multi.Slots.Select(slot => Task.Run(() => BuildOneDrive(slot))).ToArray();
             await Task.WhenAll(tasks);
+            StopIndexingProgress();
             sw.Stop();
 
             // ── 모니터 + 사전로딩 다시 시작 ──

@@ -11,7 +11,7 @@ A fast file search tool for Windows that finds files on NTFS drives by name.
 ## Features
 
 - Search by file name or extension (supports patterns like `*.jpg`, `*.png`)
-- Powerful search syntax — exclusion (`-word`), folder filter (`D:\Backup\`), size (`>100MB`), date (`>2026-01`, `>week`), name wildcards (`IMG_*_edit`)
+- Powerful search syntax — exclusion (`-word`), folder filter (`D:\Backup\`), size (`>100MB`), date (`>2026-01`, `>week`), name wildcards (`IMG_*_edit.txt`)
 - Searches multiple drives at once (fixed disks like C, D, plus USB)
 - Real-time updates via the USN journal — adding, deleting, or renaming a file is reflected in results immediately
 - Results refresh automatically when a USB drive is plugged in or removed
@@ -63,7 +63,7 @@ The .NET runtime is bundled, so there is nothing else to install.
 | `photo D:\Backup\` | search only under that folder (wrap paths with spaces in `"quotes"`) |
 | `*.mp4 >500MB` | size condition (unit required: KB MB GB TB · works alone) |
 | `photo >2026-01` · `>week` | modified-date condition (year-month-day · today / week / month / year) |
-| `IMG_*_edit` | whole-name shape match (`*` = any run, `?` = one character) |
+| `IMGedit.txt` | whole-name match incl. extension (use `IMG_edit` for any extension) |`
 
 Full details: app menu (HdrTracer ▼) → **Search help**.
 

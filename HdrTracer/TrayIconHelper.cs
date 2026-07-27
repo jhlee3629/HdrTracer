@@ -1,6 +1,8 @@
 using System.Drawing;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Windows;
+using System.Windows.Interop;
 using Loc = HdrTracer.Core.Localization;
 
 namespace HdrTracer.App;
@@ -114,10 +116,56 @@ public sealed class TrayIconHelper : IDisposable
             _window.Show();
         if (_window.WindowState == WindowState.Minimized)
             _window.WindowState = WindowState.Normal;
+
         _window.Activate();
+        ForceForeground();          // 다른 앱이 최상단일 때 Activate()가 무시되는 것 보완
         _window.Topmost = true;
         _window.Topmost = false;
         _window.Focus();
+    }
+
+    public void ForceForegroundPublic() => ForceForeground(); 
+    
+    private void ForceForeground()
+    {
+        try
+        {
+            IntPtr hWnd = new WindowInteropHelper(_window).Handle;
+            if (hWnd == IntPtr.Zero) return;
+
+            IntPtr fore = Native.GetForegroundWindow();
+            if (fore == hWnd) return;
+
+            uint foreThread = Native.GetWindowThreadProcessId(fore, IntPtr.Zero);
+            uint myThread = Native.GetCurrentThreadId();
+
+            bool attached = foreThread != 0 && foreThread != myThread
+                            && Native.AttachThreadInput(foreThread, myThread, true);
+            Native.SetForegroundWindow(hWnd);
+            if (attached)
+                Native.AttachThreadInput(foreThread, myThread, false);
+        }
+        catch { /* 실패해도 Activate() 결과에 맡김 */ }
+    }
+
+    private static class Native
+    {
+        [DllImport("user32.dll")]
+        public static extern IntPtr GetForegroundWindow();
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool SetForegroundWindow(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        public static extern uint GetWindowThreadProcessId(IntPtr hWnd, IntPtr lpdwProcessId);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        public static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
+
+        [DllImport("kernel32.dll")]
+        public static extern uint GetCurrentThreadId();
     }
 
     public void HideWindow()
@@ -125,9 +173,20 @@ public sealed class TrayIconHelper : IDisposable
         _window.Hide();
     }
 
+    /// <summary>
+    /// 창 토글. "숨김 여부"는 WPF의 IsActive가 아니라 실제 최상단 창(포그라운드)으로 판정한다.
+    /// (IsActive가 실제 화면 상태와 어긋나 첫 입력이 무시되던 문제 방지)
+    /// </summary>
     public void ToggleWindow()
     {
-        if (_window.Visibility == Visibility.Visible && _window.IsActive)
+        IntPtr hWnd = new WindowInteropHelper(_window).Handle;
+        bool isForeground = hWnd != IntPtr.Zero && Native.GetForegroundWindow() == hWnd;
+
+        bool visibleAndUp = _window.Visibility == Visibility.Visible
+                            && _window.WindowState != WindowState.Minimized
+                            && isForeground;
+
+        if (visibleAndUp)
             HideWindow();
         else
             ShowWindow();

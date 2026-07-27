@@ -30,10 +30,11 @@ public sealed class SearchEngine
         public long SizeMax = -1;       // '<' 크기: 이 값 미만
         public long DateMinTicks = 0;   // '>' 날짜: 이 시점(UTC Ticks) 이후(포함)
         public long DateMaxTicks = 0;   // '<' 날짜: 이 시점(UTC Ticks) 이전(미포함)
+        public int Kind = 0;            // 0=제한 없음, 1=폴더만(folder:), 2=파일만(file:)
 
         public bool HasAttribute => SizeMin >= 0 || SizeMax >= 0 || DateMinTicks > 0 || DateMaxTicks > 0;
         public bool Any => ExcludeTokens.Length > 0 || ExcludeExts.Count > 0
-                        || PathFilters.Length > 0 || HasAttribute;
+                        || PathFilters.Length > 0 || HasAttribute || Kind != 0;
     }
 
     public List<SearchHit> Search(IReadOnlyList<FileIndex> indexes, string query, int maxResults = 1_000_000)
@@ -138,6 +139,19 @@ public sealed class SearchEngine
                         extra.ExcludeExts.Add(rest.Substring(1));
                     else
                         excludeParts.Add(rest.ToLowerInvariant());
+                    continue;
+                }
+
+                // 폴더만 / 파일만
+                if (token.Equals("folder:", StringComparison.OrdinalIgnoreCase)
+                    || token.Equals("dir:", StringComparison.OrdinalIgnoreCase))
+                {
+                    extra.Kind = 1;
+                    continue;
+                }
+                if (token.Equals("file:", StringComparison.OrdinalIgnoreCase))
+                {
+                    extra.Kind = 2;
                     continue;
                 }
 
@@ -267,6 +281,13 @@ public sealed class SearchEngine
     /// </summary>
     private static bool PassesExtraFilters(FileIndex index, int entryIndex, ReadOnlySpan<char> name, ExtraFilters f)
     {
+        if (f.Kind != 0)
+        {
+            bool isDir = index.IsDirectory(entryIndex);
+            if (f.Kind == 1 && !isDir) return false;   // folder: → 폴더만
+            if (f.Kind == 2 && isDir)  return false;   // file:   → 파일만
+        }
+
         if (f.SizeMin >= 0 || f.SizeMax >= 0)
         {
             long size = index.GetSize(entryIndex);

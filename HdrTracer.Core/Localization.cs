@@ -111,6 +111,9 @@ public static class Localization
         ["filter.date.month"] = "최근 1달",
         ["filter.date.year"]  = "최근 1년",
         ["filter.clear"]      = "조건 지우기",
+        ["filter.kind"]        = "종류",
+        ["filter.kind.folder"] = "폴더만",
+        ["filter.kind.file"]   = "파일만",
 
         // 컬럼 헤더
         ["col.drive"] = "DRV",
@@ -126,6 +129,9 @@ public static class Localization
         ["status.results"]  = "개 결과",
         ["status.refreshDone"] = "인덱스 새로 고침 완료",
         ["status.selected"] = "{0}개 선택, {1}",
+        ["status.indexingProgress"] = "인덱싱 중… {0}초 경과  ·  {1}",
+        ["status.driveDone"]        = "{0} 완료({1:N0})",
+        ["status.driveWorking"]     = "{0} 진행 중",
 
         // 트레이
         ["tray.open"] = "HdrTracer 열기",
@@ -201,10 +207,12 @@ public static class Localization
             "사진 \"D:\\내 문서\\\"|공백이 있는 경로는 따옴표로 묶기\n" +
             "\n" +
             "#이름 모양으로 찾기 (와일드카드)\n" +
-            "IMG_*_편집|IMG_로 시작하고 _편집으로 끝나는 이름\n" +
+            "IMG_*_편집.txt|IMG_로 시작하고 _편집.txt로 끝나는 이름 (확장자까지 포함)\n" +
+            "IMG_*_편집*|확장자를 가리지 않고 찾을 때는 끝에 * 를 붙임\n" +
             "보고서*최종.hwp|'보고서'로 시작해 '최종.hwp'로 끝나는 형식\n" +
             "가을_?.jpg|? 는 글자 하나 (가을_1은 되고 가을_12는 안 됨)\n" +
             "* 이 있으면 이름 전체가 그 모양과 일치해야 합니다.\n" +
+            "프로젝트 folder:|폴더만 찾기 (파일만 찾을 때는 file:)\n" +
             "\n" +
             "#크기·날짜로 거르기\n" +
             "*.mp4 >500MB|500MB보다 큰 mp4만 (단위 필수: KB MB GB TB)\n" +
@@ -315,6 +323,9 @@ public static class Localization
         ["filter.date.month"] = "Past month",
         ["filter.date.year"]  = "Past year",
         ["filter.clear"]      = "Clear",
+        ["filter.kind"]        = "Kind",
+        ["filter.kind.folder"] = "Folders only",
+        ["filter.kind.file"]   = "Files only",
 
         // Column headers
         ["col.drive"] = "DRV",
@@ -330,6 +341,9 @@ public static class Localization
         ["status.results"]  = "results",
         ["status.refreshDone"] = "Index refresh complete",
         ["status.selected"] = "{0} selected, {1}",
+        ["status.indexingProgress"] = "Indexing… {0}s elapsed  ·  {1}",
+        ["status.driveDone"]        = "{0} done ({1:N0})",
+        ["status.driveWorking"]     = "{0} working",
 
         // Tray
         ["tray.open"] = "Open HdrTracer",
@@ -405,10 +419,12 @@ public static class Localization
             "photo \"D:\\My Docs\\\"|wrap paths with spaces in quotes\n" +
             "\n" +
             "#Match by name shape (wildcards)\n" +
-            "IMG_*_edit|names starting IMG_ and ending _edit\n" +
+            "IMG_*_edit.txt|starts with IMG_, ends with _edit.txt (extension included)\n" +
+            "IMG_*_edit*|add a trailing * to match any extension\n" +
             "report*final.docx|starts with 'report', ends 'final.docx'\n" +
             "photo_?.jpg|? is a single character (photo_1 yes, photo_12 no)\n" +
             "With * the whole name must match the shape.\n" +
+            "project folder:|folders only (use file: for files only)\n" +
             "\n" +
             "#Filter by size / date\n" +
             "*.mp4 >500MB|mp4 larger than 500MB (unit required: KB MB GB TB)\n" +
