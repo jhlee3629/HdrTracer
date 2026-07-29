@@ -1,110 +1,118 @@
 # HdrTracer
 
-한국어 | [English](README.en.md)
+English | [한국어](README.ko.md)
 
 <img src="docs/1.png" width="700" alt="HdrTracer main window">
 
+*Main window — type a file name and press Enter.*
+
 <img src="docs/2.png" width="700" alt="App menu">
+
+*App menu — settings, filters, language, search help and more.*
 
 <img src="docs/3.png" width="700" alt="Search results with a folder filter">
 
-NTFS 드라이브의 파일을 이름으로 빠르게 찾는 윈도우용 검색 도구.
+*Search results — `thumb D:\Backup\photos\`*
 
-## 기능
+A fast file search tool for Windows that finds files on NTFS drives by name.
 
-- 파일 이름 / 확장자로 검색 (`*.jpg`, `*.png` 같은 패턴 지원)
-- 강력한 검색 문법 — 제외(`-단어`), 폴더 한정(`D:\백업\`), 크기(`>100MB`), 날짜(`>2026-01`, `>week`), 이름 와일드카드(`IMG_*_편집.txt`)
-- 여러 드라이브 동시 검색 (C, D 등 고정 디스크 + USB)
-- USN 저널 기반 실시간 반영 — 파일을 추가/삭제/이름변경하면 결과에 바로 반영
-- USB를 꽂거나 빼면 검색 결과 자동으로 갱신
-- 북마크(고정 검색) — 자주 쓰는 검색을 📌 고정하고 `Ctrl+1~9`로 즉시 실행
-- 결과 활용 — 우클릭(열기 / 폴더에서 보기 / 이 폴더에서만 검색 / 경로 복사),
-  탐색기로 드래그 앤 드롭, CSV 내보내기, 선택 항목 개수·총 크기 표시
-- 검색 제외 폴더 — WinSxS, node_modules 같은 시스템성 폴더를 결과에서 숨김
-- 창 크기·위치·컬럼 너비·정렬 상태를 기억해 다음 실행 때 그대로 복원
-- 트레이 상주 + 원하면 Windows 시작 시 자동 실행 (작업 스케줄러 방식 — 로그인 시 UAC 없음, 기본 꺼짐)
-- 전역 단축키 `Win + Alt + S` — 다른 앱 사용 중에도 창을 즉시 불러오고, 다시 누르면 트레이로 (설정에서 끌 수 있음)
-- 다크 테마, 한국어 / 영어 지원 (첫 실행 시 …) → - 다크 테마, 7개 언어 지원: 한국어 · 영어 · 중국어(간체) · 일본어 · 스페인어 · 독일어 · 프랑스어 (첫 실행 시 Windows 표시 언어에 맞춰 시작)
+## Features
 
-## 요구 사항
+- Search by file name or extension (supports patterns like `*.jpg`, `*.png`)
+- Powerful search syntax — exclusion (`-word`), folder filter (`D:\Backup\`), size (`>100MB`), date (`>2026-01`, `>week`), name wildcards (`IMG_*_edit.txt`)
+- Searches multiple drives at once (fixed disks like C, D, plus USB)
+- Real-time updates via the USN journal — adding, deleting, or renaming a file is reflected in results immediately
+- Results refresh automatically when a USB drive is plugged in or removed
+- Pinned searches — pin frequent queries (📌) and run them instantly with `Ctrl+1~9`
+- Work with results — right-click (open / show in folder / search in this folder / copy path),
+  drag & drop into File Explorer, export to CSV, selection count & total size in the status bar
+- Excluded folders — hide system-ish folders like WinSxS or node_modules from results
+- Remembers your window size & position, column widths, and sort order
+- Lives in the tray + optional "Start with Windows" (via Task Scheduler — no UAC prompt at sign-in, off by default)
+- Global hotkey `Win + Alt + S` — summon the window from any app, press again to hide to tray (can be disabled in Settings)
+- Dark theme, Korean / English support (first run …) → - Dark theme, 7 languages: Korean, English, Chinese (Simplified), Japanese, Spanish, German, French (first run follows your Windows display language)
 
-- 64비트 윈도우 (Windows 11)
-- NTFS 파일 시스템 (FAT32, exFAT는 인덱싱 안 됨)
-- 관리자 권한
+## Requirements
 
-### 관리자 권한이 필요한 이유
+- 64-bit Windows (Windows 11)
+- NTFS file system (FAT32 and exFAT are not indexed)
+- Administrator privileges
 
-MFT와 USN 저널을 직접 읽으려면 볼륨에 대한 낮은 수준의 접근 권한이 필요함.
-그래서 실행할 때마다 UAC 창이 한 번 나타남.
+### Why administrator privileges are needed
 
-이 권한은 검색 인덱싱을 위해 볼륨을 **읽는 용도로만** 쓰임.
-앱이 사용자 동작 없이 파일을 임의로 수정·삭제하지 않음.
+Reading the MFT and USN journal directly requires low-level access to the volume.
+Because of this, a UAC prompt appears each time the app starts.
 
-## 설치
+This access is used **only to read** the volume for search indexing.
+The app does not modify or delete any file without an explicit user action.
 
-[릴리스](../../releases/latest)에서 `HdrTracer_Setup_*.exe`를 받아 실행.
+## Installation
 
-설치 파일이나 실행 파일은 코드 서명이 되어 있지 않아서,
-처음 실행할 때 "Windows의 PC 보호" (SmartScreen) 경고가 한 번 뜰 수 있음.
-추가 정보 → 실행을 누르면 진행됨.
+Download `HdrTracer_Setup_*.exe` from the [latest release](../../releases/latest) and run it.
 
-.NET 런타임이 포함되어 있어서 따로 설치할 것이 없음.
+The installer and executable are not code-signed, so the first time you run them
+Windows may show a "Windows protected your PC" (SmartScreen) warning.
+Click **More info → Run anyway** to proceed.
 
-## 사용법
+The .NET runtime is bundled, so there is nothing else to install.
 
-1. 실행하면 연결된 NTFS 드라이브를 인덱싱 (처음 한 번, 드라이브 크기에 따라 몇 초).
-2. 검색창에 파일 이름이나 확장자를 입력하고 Enter.
+## Usage
 
-### 검색 문법
+1. On launch, the app indexes connected NTFS drives (once, takes a few seconds depending on drive size).
+2. Type a file name or extension in the search box and press Enter.
 
-| 입력 | 의미 |
+### Search syntax
+
+| Type | Meaning |
 |---|---|
-| `휴가 사진` | 두 단어가 모두 이름에 있는 것 (공백 = 그리고) |
-| `*.jpg *.png` | 해당 확장자만 |
-| `보고서 -임시` | 이름에 '임시'가 든 것은 제외 (`-*.log` 는 확장자 제외) |
-| `사진 D:\백업\` | 그 폴더 아래에서만 검색 (공백 있는 경로는 `"따옴표"`로 묶기) |
-| `*.mp4 >500MB` | 크기 조건 (단위 필수: KB MB GB TB · 단독 사용 가능) |
-| `사진 >2026-01` · `>week` | 수정 날짜 조건 (연-월-일 순서 · today / week / month / year) |
-| `IMG_편집.txt` | 이름 전체가 그 모양인 것 (확장자 포함 · 아무 확장자면 `IMG_편집*`) |`
+| `vacation photo` | names containing both words (space = AND) |
+| `*.jpg *.png` | those extensions only |
+| `report -draft` | skip names containing 'draft' (`-*.log` excludes an extension) |
+| `photo D:\Backup\` | search only under that folder (wrap paths with spaces in `"quotes"`) |
+| `*.mp4 >500MB` | size condition (unit required: KB MB GB TB · works alone) |
+| `photo >2026-01` · `>week` | modified-date condition (year-month-day · today / week / month / year) |
+| `IMGedit.txt` | whole-name match incl. extension (use `IMG_edit` for any extension) |`
 
-자세한 설명은 앱 메뉴(HdrTracer ▼) → **검색 도움말**에 있습니다.
+Full details: app menu (HdrTracer ▼) → **Search help**.
 
-### 북마크 (고정 검색)
+### Pinned searches
 
-검색창을 클릭하면 최근 검색 목록이 뜹니다. 항목의 📌 버튼으로 고정하면 목록 맨 위에
-계속 유지되고, 위에서부터 `Ctrl+1~9`로 즉시 실행할 수 있습니다.
+Click the search box to see recent searches. Pin one with the 📌 button to keep it at the
+top of the list, and run pinned searches instantly with `Ctrl+1~9` (top to bottom).
 
-### 숨김·시스템 항목
+### Hidden / system items
 
-탐색기에서 안 보이는 숨김·시스템 속성 항목(예: 백신이 만드는 보호 폴더, NTFS 내부 파일)은
-기본적으로 검색 결과에서 제외. 설정에서 "숨김·시스템 항목 표시"를 켜면 결과에 포함.
+Items with the hidden + system attribute that don't appear in File Explorer
+(e.g. protection folders created by antivirus software, NTFS internal files)
+are excluded from results by default. Turn on "Show hidden/system items" in
+settings to include them.
 
-## 설정
+## Settings
 
-- 이동식 드라이브(USB) 인덱싱 on/off
-- 닫기 버튼 동작 (트레이로 숨김 / 종료)
-- 숨김·시스템 항목 표시
-- 검색에서 제외할 폴더 이름 (예: `WinSxS; node_modules`)
-- Windows 시작 시 자동 실행 (작업 스케줄러 등록 — 로그인 시 UAC 없이 실행, 기본 꺼짐)
+- Removable drive (USB) indexing on/off
+- Close button behavior (minimize to tray / exit)
+- Show hidden/system items
+- Folder names to exclude from search (e.g. `WinSxS; node_modules`)
+- Start with Windows (registered via Task Scheduler — runs at sign-in without a UAC prompt, off by default)
 
-## 개인정보·데이터
+## Privacy & data
 
-- 네트워크 통신을 하지 않음. 파일 이름·경로·내용을 **외부로 전송하지 않으며**, 어떤 사용량/추적 정보도 수집하지 않음. (인터넷 연결이나 계정이 필요 없음)
-- 인덱스와 설정은 **로컬에만** 저장됨:
-  - 인덱스 캐시: `%LocalAppData%\HdrTracer\indexes\`
-  - 설정: `%LocalAppData%\HdrTracer\settings.json`
-- 앱을 제거한 뒤 위 `HdrTracer` 폴더를 지우면 저장된 데이터가 모두 사라짐.
+- No network communication. File names, paths, and contents are **never sent anywhere**, and no usage/telemetry data is collected. (No internet connection or account required.)
+- Index and settings are stored **locally only**:
+  - Index cache: `%LocalAppData%\HdrTracer\indexes\`
+  - Settings: `%LocalAppData%\HdrTracer\settings.json`
+- Deleting the `HdrTracer` folder above after uninstalling removes all stored data.
 
-## 알림
+## Notes
 
-- NTFS 전용. 다른 파일 시스템은 인덱싱하지 않음.
-- 파일 내용 검색은 안 됨. 이름과 경로만 검색함.
-- 코드 서명이 없어서 SmartScreen 경고가 나타남.
-- 삭제는 영구 삭제가 아니라 **휴지통으로 이동**이라 복구할 수 있음. 시스템 폴더 등 중요한 경로가 포함되면 삭제 전 한 번 더 경고함.
+- NTFS only. Other file systems are not indexed.
+- No file content search. Only names and paths are searched.
+- SmartScreen warning appears because the build is not code-signed.
+- Deletion moves items to the **Recycle Bin** (recoverable), not a permanent delete. If system-critical paths are included, an extra warning is shown before deleting.
 
-## 라이선스
+## License
 
-코드는 MIT 라이선스를 따른다.
+The code is released under the MIT License.
 
-앱 아이콘은 [Muhammad_Usman](https://www.flaticon.com/)이 제작한 것으로,
-[Flaticon](https://www.flaticon.com/)에서 받았다 (출처 표기 조건의 무료 사용).
+The app icon was created by [Muhammad_Usman](https://www.flaticon.com/) and
+obtained from [Flaticon](https://www.flaticon.com/) (free to use with attribution).
