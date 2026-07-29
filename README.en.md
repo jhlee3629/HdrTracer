@@ -4,7 +4,15 @@
 
 <img src="docs/1.png" width="700" alt="HdrTracer main window">
 
-<img src="docs/2.png" width="700" alt="Extension (txt) search results">
+*Main window — type a file name and press Enter.*
+
+<img src="docs/2.png" width="700" alt="App menu">
+
+*App menu — settings, filters, language, search help and more.*
+
+<img src="docs/3.png" width="700" alt="Search results with a folder filter">
+
+*Search results — `thumb D:\Backup\photos\`*
 
 A fast file search tool for Windows that finds files on NTFS drives by name.
 
