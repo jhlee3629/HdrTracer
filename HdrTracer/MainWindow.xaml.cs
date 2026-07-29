@@ -201,9 +201,7 @@ public partial class MainWindow : Window
 
         // 저장된 언어 적용
         HdrTracer.Core.Localization.Current =
-            _settings.Language == "en"
-                ? HdrTracer.Core.Localization.Lang.English
-                : HdrTracer.Core.Localization.Lang.Korean;
+            HdrTracer.Core.Localization.FromCode(_settings.Language);
 
         // 저장된 언어로 컬럼 헤더 등 초기 텍스트 반영
         ApplyLocalizedTexts();
@@ -2816,23 +2814,31 @@ public partial class MainWindow : Window
         // 한영 전환을 위한 서브메뉴
         var langItem = new MenuItem { Header = Loc.T("menu.language") };
 
-        bool isKo = Loc.Current == Loc.Lang.Korean;
-
-        var koItem = new MenuItem
+        // 지원 언어 전체를 목록으로.
+        // 체크 표시는 MenuItem.IsChecked 대신 헤더 안에 고정폭(18px) 칸으로 직접 그린다
+        // — 다크 테마 메뉴 스타일이 기본 체크 표시를 그리지 않는 경우에도 보이고, 정렬도 맞는다.
+        foreach (var lang in Loc.SupportedLanguages)
         {
-            Header = Loc.T("menu.lang.ko"),
-            IsChecked = isKo          // 현재 언어에 체크 표시 (텍스트 정렬은 자동)
-        };
-        koItem.Click += (_, _) => ChangeLanguage(Loc.Lang.Korean);
-        langItem.Items.Add(koItem);
+            var target = lang;   // 클로저 캡처
 
-        var enItem = new MenuItem
-        {
-            Header = Loc.T("menu.lang.en"),
-            IsChecked = !isKo
-        };
-        enItem.Click += (_, _) => ChangeLanguage(Loc.Lang.English);
-        langItem.Items.Add(enItem);
+            var row = new StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal };
+            row.Children.Add(new TextBlock
+            {
+                Text = Loc.Current == target ? "\u2713" : "",   // ✓
+                Width = 18,
+                FontSize = 12,
+                VerticalAlignment = VerticalAlignment.Center
+            });
+            row.Children.Add(new TextBlock
+            {
+                Text = Loc.T(Loc.NameKey(target)),
+                VerticalAlignment = VerticalAlignment.Center
+            });
+
+            var item = new MenuItem { Header = row };
+            item.Click += (_, _) => ChangeLanguage(target);
+            langItem.Items.Add(item);
+        }
 
         menu.Items.Add(langItem);
 
@@ -2876,7 +2882,7 @@ public partial class MainWindow : Window
         if (Loc.Current == lang) return;
 
         Loc.Current = lang;
-        _settings.Language = (lang == Loc.Lang.English) ? "en" : "ko";
+        _settings.Language = Loc.ToCode(lang);
         _settings.Save();
 
         // 즉시 반영되는 부분 갱신 (메뉴는 다음에 열 때 자동 반영됨)

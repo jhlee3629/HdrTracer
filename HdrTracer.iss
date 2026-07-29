@@ -6,7 +6,7 @@
 ; ============================================================
 
 #define MyAppName "HdrTracer"
-#define MyAppVersion "1.1.0"
+#define MyAppVersion "1.1.1"
 #define MyAppPublisher "HdrTracer"
 #define MyAppExeName "HdrTracer.exe"
 
@@ -50,10 +50,16 @@ UninstallDisplaySize=73400320
 UsedUserAreasWarning=no
 ; Windows 11만 지원하려면 최소 버전 지정 (10.0 = Win10/11)
 MinVersion=10.0
+ShowLanguageDialog=no
+LanguageDetectionMethod=uilanguage
 
 [Languages]
-Name: "korean"; MessagesFile: "compiler:Languages\Korean.isl"
 Name: "english"; MessagesFile: "compiler:Default.isl"
+Name: "korean"; MessagesFile: "compiler:Languages\Korean.isl"
+Name: "german";   MessagesFile: "compiler:Languages\German.isl"
+Name: "spanish";  MessagesFile: "compiler:Languages\Spanish.isl"
+Name: "french";   MessagesFile: "compiler:Languages\French.isl"
+Name: "japanese"; MessagesFile: "compiler:Languages\Japanese.isl"
 
 [Tasks]
 ; 바탕화면 바로가기는 선택 (체크박스로 사용자가 끌 수 있음)
