@@ -319,6 +319,7 @@
                                             Foreground="#888"
                                             Background="Transparent"
                                             BorderThickness="0"
+                                            Cursor="Hand"
                                             Width="28"
                                             ToolTip="{DynamicResource TipPin}"/>
                                     <Button Grid.Column="2"
@@ -330,6 +331,7 @@
                                             Foreground="#888"
                                             Background="Transparent"
                                             BorderThickness="0"
+                                            Cursor="Hand"
                                             Width="28"
                                             ToolTip="{DynamicResource TipDelete}"/>
                                 </Grid>
@@ -560,12 +562,18 @@
                                             RenderOptions.BitmapScalingMode="HighQuality"/>
                                         <TextBlock Text="{Binding Name}"
                                                 VerticalAlignment="Center"
-                                                TextTrimming="CharacterEllipsis"/>
+                                                TextTrimming="CharacterEllipsis"
+                                                ToolTip="{Binding Name}"
+                                                ToolTipService.ShowDuration="20000"
+                                                ToolTipService.InitialShowDelay="600"/>
                                     </StackPanel>
                                     <TextBlock Grid.Column="2" Text="{Binding Path}"
                                             VerticalAlignment="Center" Margin="8,0,0,0"
                                             Foreground="#AAAAAA"
-                                            TextTrimming="CharacterEllipsis"/>
+                                            TextTrimming="CharacterEllipsis"
+                                            ToolTip="{Binding Path}"
+                                            ToolTipService.ShowDuration="20000"
+                                            ToolTipService.InitialShowDelay="600"/>
                                     <TextBlock Grid.Column="3" Text="{Binding SizeText}"
                                             VerticalAlignment="Center" Margin="8,0,0,0"
                                             Foreground="#AAAAAA"/>

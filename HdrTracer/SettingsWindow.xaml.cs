@@ -35,6 +35,7 @@ public partial class SettingsWindow : Window
         _initialExcluded = NormalizeExcluded(ExcludedBox.Text);
         _initialHotkey = settings.GlobalHotkeyEnabled;
         HotkeyCheckBox.IsChecked = _initialHotkey;
+        RestoreSearchCheckBox.IsChecked = settings.RestoreLastSearch;
         TrayCheckBox.IsChecked = settings.MinimizeToTrayOnClose;
         HiddenSystemCheckBox.IsChecked = settings.ShowHiddenSystemItems;
 
@@ -74,6 +75,8 @@ public partial class SettingsWindow : Window
         ExcludedDesc.Text   = Loc.T("settings.excluded.desc");
         HotkeyTitle.Text    = Loc.T("settings.hotkey");
         HotkeyDesc.Text     = Loc.T("settings.hotkey.desc");
+        RestoreSearchTitle.Text = Loc.T("settings.restoreSearch");
+        RestoreSearchDesc.Text  = Loc.T("settings.restoreSearch.desc");
         OkButton.Content = Loc.T("settings.ok");
     }
 
@@ -132,6 +135,7 @@ public partial class SettingsWindow : Window
         bool hk = HotkeyCheckBox.IsChecked ?? false;
         HotkeyChanged = hk != _initialHotkey;
         Settings.GlobalHotkeyEnabled = hk;
+        Settings.RestoreLastSearch = RestoreSearchCheckBox.IsChecked ?? false;
 
         Settings.Save();
 

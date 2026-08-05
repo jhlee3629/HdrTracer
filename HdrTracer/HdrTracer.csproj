@@ -16,16 +16,14 @@
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
 
     <!-- 앱 메타데이터 (Windows 파일 속성 창에 표시됨) -->
-    <AssemblyName>HdrTracer</AssemblyName>
-    <RootNamespace>HdrTracer.App</RootNamespace>
     <Product>HdrTracer</Product>
-    <AssemblyTitle>HdrTracer - Fast File Search</AssemblyTitle>
-    <Description>NTFS raw MFT 기반 초고속 파일 검색기</Description>
-    <Company>HdrTracer</Company>
+    <AssemblyTitle>HdrTracer</AssemblyTitle>
+    <Description>NTFS 파일 검색 도구</Description>
+    <Company>HaeDream</Company>
     <Copyright>Copyright © 2026</Copyright>
-    <Version>1.1.1</Version>
-    <AssemblyVersion>1.1.1.0</AssemblyVersion>
-    <FileVersion>1.1.1.0</FileVersion>
+    <Version>1.2.0</Version>
+    <AssemblyVersion>1.2.0.0</AssemblyVersion>
+    <FileVersion>1.2.0.0</FileVersion>
 
     <!-- 단일 exe 배포 빌드 옵션 (dotnet publish 명령에서만 의미 있음) -->
     <PublishSingleFile>true</PublishSingleFile>

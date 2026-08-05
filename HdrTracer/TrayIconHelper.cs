@@ -124,8 +124,13 @@ public sealed class TrayIconHelper : IDisposable
         _window.Focus();
     }
 
-    public void ForceForegroundPublic() => ForceForeground(); 
-    
+    /// <summary>
+    /// Windows의 포그라운드 잠금 때문에 백그라운드 앱의 Activate()가 거부될 수 있다.
+    /// 현재 최상단 창의 입력 스레드에 잠시 붙어서 확실히 앞으로 가져온다.
+    /// </summary>
+    /// <summary>메인 창이 전역 단축키로 소환될 때도 같은 보완을 쓸 수 있게 공개.</summary>
+    public void ForceForegroundPublic() => ForceForeground();
+
     private void ForceForeground()
     {
         try

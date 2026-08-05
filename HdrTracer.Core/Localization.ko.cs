@@ -110,6 +110,7 @@ public static partial class Localization
         ["status.results"]  = "개 결과",
         ["status.refreshDone"] = "인덱스 새로 고침 완료",
         ["status.selected"] = "{0}개 선택, {1}",
+        ["status.selectedMany"]     = "{0:N0}개 선택",
         ["status.indexingProgress"] = "인덱싱 중… {0}초 경과  ·  {1}",
         ["status.driveDone"]        = "{0} 완료({1:N0})",
         ["status.driveWorking"]     = "{0} 진행 중",
@@ -140,7 +141,9 @@ public static partial class Localization
         ["settings.excluded.desc"] = "세미콜론(;)으로 구분. 이 이름의 폴더와 그 안의 모든 항목이 결과에서 숨겨집니다. 예: WinSxS; node_modules",
         ["settings.hotkey"]      = "Global hotkey (Win+Alt+S)",
         ["settings.hotkey"]      = "전역 단축키 (Win+Alt+S)",
-        ["settings.hotkey.desc"] = "어떤 앱을 쓰는 중에도 Win+Alt+S로 창을 불러오고, 다시 누르면 트레이로 숨깁니다.",
+        ["settings.hotkey.desc"] = "어떤 앱을 쓰는 중에도 Win+Alt+S로 창을 불러옵니다. 창을 치울 때는 Esc를 쓰세요.",
+        ["settings.restoreSearch"]      = "시작할 때 마지막 검색어 복원",
+        ["settings.restoreSearch.desc"] = "앱을 다시 열면 마지막에 쓴 검색어로 검색된 상태로 시작합니다.",
         ["hotkey.fail"]          = "전역 단축키(Win+Alt+S) 등록 실패 — 다른 프로그램이 이 키를 사용 중일 수 있습니다.",
 
         // 단축키 창
@@ -154,7 +157,7 @@ public static partial class Localization
         ["sc.searchBox"]    = "검색창",
         ["sc.pinnedSearch"] = "고정 검색 실행 (📌 위에서부터 1~9)",
         ["sc.focusSearch"]  = "검색창에 포커스",
-        ["sc.clearSearch"]  = "검색어 지우기",
+        ["sc.clearSearch"]  = "검색어 지우기 (비어 있으면 트레이로)",
         ["sc.gotoResults"]  = "결과 리스트로 이동",
         ["sc.resultList"]   = "결과 리스트",
         ["sc.openItem"]     = "선택한 항목 열기",
@@ -166,11 +169,11 @@ public static partial class Localization
         ["sc.backToSearch"] = "검색창으로 돌아가기",
         ["sc.dblClick"]     = "더블클릭",
         ["sc.globalSc"]     = "전역 단축키",
-        ["sc.toggleApp"]    = "어디서든 앱 보이기/숨기기",
+        ["sc.toggleApp"]    = "어디서든 창을 앞으로 (숨기려면 Esc)",
         ["sc.searchTips"]   = "검색 팁",
         ["sc.tip1"]         = "여러 단어를 공백으로 구분하면 모두 포함하는 결과를 찾습니다 (AND 검색).",
         ["sc.tip2"]         = "한글은 2글자, 영문은 3글자 이상부터 빠른 N-gram 검색이 동작합니다.",
-        ["sc.globalHotkey"]      = "창 불러오기 / 숨기기 (다른 앱 사용 중에도)",
+        ["sc.globalHotkey"]      = "창 불러오기 (다른 앱 사용 중에도)",
 
         ["help.search.title"] = "검색 도움말",
         ["help.search.body"] =

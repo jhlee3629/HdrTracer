@@ -35,6 +35,23 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <!-- 창 가장자리 버튼(닫기)용: 포커스 사각형을 컨트롤 "안쪽"에 그린다.
+             바깥(-3)에 그리면 창 경계에서 잘리거나 보이지 않는다. -->
+        <Style x:Key="InnerFocusVisual">
+            <Setter Property="Control.Template">
+                <Setter.Value>
+                    <ControlTemplate>
+                        <Rectangle Margin="2"
+                                   StrokeThickness="1"
+                                   Stroke="#C8C8CE"
+                                   StrokeDashArray="2 1"
+                                   RadiusX="2" RadiusY="2"
+                                   SnapsToDevicePixels="True"/>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
     <Grid>
@@ -42,6 +59,7 @@
             <RowDefinition Height="32"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="48"/>
+            <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
         <!-- 타이틀바 -->
@@ -62,7 +80,7 @@
                     x:Name="CloseButton"
                     Click="CloseButton_Click"
                     Style="{StaticResource CloseButtonStyle}"
-                    FocusVisualStyle="{StaticResource BrightFocusVisual}"
+                    FocusVisualStyle="{StaticResource InnerFocusVisual}"
                     Content="&#xE8BB;"
                     WindowChrome.IsHitTestVisibleInChrome="True"/>
         </Grid>
@@ -70,6 +88,7 @@
         <!-- 본문 -->
         <Grid Grid.Row="1" Margin="20,16,20,16">
             <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
@@ -202,8 +221,31 @@
                         FocusVisualStyle="{StaticResource BrightFocusVisual}"/>
             </Grid>
 
+            <!-- 시작 시 마지막 검색어 복원 -->
+            <Grid Grid.Row="6" Margin="0,16,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                    <TextBlock x:Name="RestoreSearchTitle" Text="시작할 때 마지막 검색어 복원"
+                            Foreground="White"
+                            FontSize="13"/>
+                    <TextBlock x:Name="RestoreSearchDesc" Text="앱을 다시 열면 마지막에 쓴 검색어로 검색된 상태로 시작합니다."
+                            Foreground="#888"
+                            FontSize="11"
+                            Margin="0,2,0,0"
+                            TextWrapping="Wrap"/>
+                </StackPanel>
+                <CheckBox Grid.Column="1"
+                        x:Name="RestoreSearchCheckBox"
+                        VerticalAlignment="Center"
+                        Style="{StaticResource DarkToggleStyle}"
+                        FocusVisualStyle="{StaticResource BrightFocusVisual}"/>
+            </Grid>
+
             <!-- 검색 제외 폴더 이름 -->
-            <StackPanel Grid.Row="6" Margin="0,16,0,0">
+            <StackPanel Grid.Row="7" Margin="0,16,0,0">
                 <TextBlock x:Name="ExcludedTitle" Text="검색에서 제외할 폴더 이름"
                         Foreground="White"
                         FontSize="13"/>
@@ -222,7 +264,7 @@
                         FontSize="13"/>
             </StackPanel>
 
-            <TextBlock Grid.Row="7"
+            <TextBlock Grid.Row="8"
                     x:Name="StatusText"
                     Foreground="#7CB7FF"
                     FontSize="11"

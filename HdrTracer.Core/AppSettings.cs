@@ -46,6 +46,12 @@ public sealed class AppSettings
     public double WinHeight { get; set; } = 0;
     public bool   WinMaximized { get; set; } = false;
 
+    /// <summary>시작 시 마지막 검색어를 복원할지 (기본 꺼짐)</summary>
+    public bool RestoreLastSearch { get; set; } = false;
+
+    /// <summary>종료 시 저장된 마지막 검색어</summary>
+    public string LastSearchQuery { get; set; } = "";
+
     private static string GetSettingsPath()
     {
         var dir = Path.Combine(

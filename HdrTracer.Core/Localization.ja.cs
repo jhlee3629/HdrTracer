@@ -95,7 +95,7 @@ public static partial class Localization
         ["filter.kind.file"]   = "ファイルのみ",
 
         // 컬럼·상태
-        ["col.drive"]  = "ドライブ",
+        ["col.drive"]  = "DRV",
         ["col.name"]   = "名前",
         ["col.path"]   = "パス",
         ["col.size"]   = "サイズ",
@@ -106,6 +106,7 @@ public static partial class Localization
         ["status.results"]          = "件の結果",
         ["status.refreshDone"]      = "インデックスの再作成が完了しました",
         ["status.selected"]         = "{0} 件選択、{1}",
+        ["status.selectedMany"]     = "{0:N0} 件選択",
         ["status.indexingProgress"] = "インデックス中… {0} 秒経過  ·  {1}",
         ["status.driveDone"]        = "{0} 完了({1:N0})",
         ["status.driveWorking"]     = "{0} 処理中",
@@ -135,7 +136,9 @@ public static partial class Localization
         ["settings.excluded"]      = "検索から除外するフォルダー名",
         ["settings.excluded.desc"] = "セミコロン (;) で区切ります。この名前のフォルダーとその中の項目が結果から隠れます。例: WinSxS; node_modules",
         ["settings.hotkey"]        = "グローバル ホットキー (Win+Alt+S)",
-        ["settings.hotkey.desc"]   = "どのアプリからでも Win+Alt+S でウィンドウを呼び出し、もう一度押すとトレイに隠します。",
+        ["settings.hotkey.desc"]   = "どのアプリからでも Win+Alt+S でウィンドウを呼び出します。隠すには Esc を使います。",
+        ["settings.restoreSearch"]      = "起動時に前回の検索を復元",
+        ["settings.restoreSearch.desc"] = "アプリを開き直すと、前回の検索語で検索した状態で始まります。",
         ["hotkey.fail"]            = "グローバル ホットキー (Win+Alt+S) の登録に失敗しました — 他のプログラムが使用している可能性があります。",
 
         // 단축키 창
@@ -149,7 +152,7 @@ public static partial class Localization
         ["sc.searchBox"]    = "検索ボックス",
         ["sc.pinnedSearch"] = "ピン留めした検索を実行（上から 1〜9）",
         ["sc.focusSearch"]  = "検索ボックスにフォーカス",
-        ["sc.clearSearch"]  = "検索をクリア",
+        ["sc.clearSearch"]  = "検索をクリア（もう一度押すとトレイへ）",
         ["sc.gotoResults"]  = "結果リストへ移動",
         ["sc.resultList"]   = "結果リスト",
         ["sc.openItem"]     = "選択した項目を開く",
@@ -161,8 +164,8 @@ public static partial class Localization
         ["sc.backToSearch"] = "検索ボックスに戻る",
         ["sc.dblClick"]     = "ダブルクリック",
         ["sc.globalSc"]     = "グローバル ショートカット",
-        ["sc.toggleApp"]    = "どこからでもアプリを表示/非表示",
-        ["sc.globalHotkey"] = "ウィンドウの表示 / 非表示（どのアプリからでも）",
+        ["sc.toggleApp"]    = "どこからでもウィンドウを呼び出す（隠すには Esc）",
+        ["sc.globalHotkey"] = "ウィンドウを前面に出す（どのアプリからでも）",
         ["sc.searchTips"]   = "検索のヒント",
         ["sc.tip1"]         = "複数の語をスペースで区切ると、すべてを含む結果を検索します（AND 検索）。",
         ["sc.tip2"]         = "韓国語は 2 文字以上、英字は 3 文字以上で N-gram 高速検索が使えます。",

@@ -228,7 +228,7 @@ public partial class MainWindow : Window
             if (_globalHotkey is null)
             {
                 _globalHotkey = new GlobalHotkey(this);
-                _globalHotkey.Pressed += (_, _) => ToggleVisibility();
+                _globalHotkey.Pressed += (_, _) => SummonWindow();
             }
 
             bool ok = _globalHotkey.Register(
@@ -247,6 +247,24 @@ public partial class MainWindow : Window
     private void UnregisterGlobalHotkey()
     {
         try { _globalHotkey?.Unregister(); } catch { /* 무시 */ }
+    }
+
+    // 전역 단축키(Win+Alt+S)로 창 불러오기 — "앞으로 가져오기"만 한다.
+    // 토글로 만들면 창이 다른 앱 뒤에 있을 때 첫 입력이 "숨기기"로 해석돼
+    // 아무 일도 일어나지 않은 것처럼 보인다(두 번째부터 동작하는 현상의 원인).
+    // 창을 치울 때는 Esc(단계 동작) 또는 트레이 아이콘 클릭을 쓴다.
+    private void SummonWindow()
+    {
+        if (Visibility != Visibility.Visible) Show();
+        if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
+
+        Activate();
+        _trayIcon?.ForceForegroundPublic();   // 포그라운드 잠금 보완 (Activate 무시 방지)
+        Topmost = true;
+        Topmost = false;
+        Focus();
+        SearchBox.Focus();
+        SearchBox.SelectAll();
     }
 
     private void ToggleVisibility()
@@ -315,15 +333,6 @@ public partial class MainWindow : Window
             StartMetadataPreloader(slot);
         }
 
-        totalSw.Stop();
-
-        // 모니터 시작
-        foreach (var slot in _multi.Slots)
-        {
-            StartMonitorIfReady(slot);
-            StartMetadataPreloader(slot);
-        }
-
         // 트레이 아이콘 (인덱싱 다 끝나고 나서 초기화)
         try
         {
@@ -365,6 +374,14 @@ public partial class MainWindow : Window
             SearchBox.Focus();
             Keyboard.Focus(SearchBox);
         }), System.Windows.Threading.DispatcherPriority.Input);
+
+        // 설정이 켜져 있으면 마지막 검색어를 복원해 바로 실행 (기본 꺼짐)
+        if (_settings.RestoreLastSearch && !string.IsNullOrWhiteSpace(_settings.LastSearchQuery))
+        {
+            SearchBox.Text = _settings.LastSearchQuery;
+            SearchBox.CaretIndex = SearchBox.Text.Length;
+            RunSearch();
+        }
     }
 
     // ── 인덱싱 진행 표시 ──────────────────────────────
@@ -1429,7 +1446,7 @@ public partial class MainWindow : Window
         // 1단계: 결과 리스트에 선택이 있으면 선택만 해제 (검색어는 유지)
         if (ResultsList.SelectedItems.Count > 0)
         {
-            ResultsList.UnselectAll();
+            ClearResultSelectionFast();
             return;
         }
 
@@ -1573,11 +1590,18 @@ public partial class MainWindow : Window
     {
         if (IsClickOnEmptySpace(e))
         {
-            ResultsList.UnselectAll();
+            ClearResultSelectionFast();
             _dragArmed = false;
         }
         else
         {
+            // 대량 선택 상태에서 항목을 그냥 클릭하면(수식키 없이) WPF가 수십만 개를
+            // 하나씩 해제하며 UI가 멈춘다. 그 전에 우리가 빠르게 비워둔다.
+            // (Ctrl/Shift 클릭은 기존 선택을 유지·확장하는 동작이므로 건드리지 않는다)
+            bool plainClick = (Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) == 0;
+            if (plainClick && ResultsList.SelectedItems.Count > 2000)
+                ClearResultSelectionFast();
+
             // 항목 위에서 눌렀으면 드래그 시작 후보로 기록
             _dragStart = e.GetPosition(null);
             _dragArmed = true;
@@ -1629,7 +1653,95 @@ public partial class MainWindow : Window
         _footerNoticeUntil = DateTime.MaxValue;  // 사용자가 직접 행동할 때까지 유지
     }
 
+    // 대량 선택(Ctrl+A 등) 해제 전용.
+    // WPF의 UnselectAll()은 선택 항목이 수만~수십만 개면 해제 목록을 통째로 만들며
+    // UI가 몇 초간 멈춘다(응답 없음). 그 경우에는 목록을 다시 바인딩해 즉시 해제하고,
+    // 스크롤 위치는 그대로 복원한다. 소량이면 기존 방식 그대로.
+    private ScrollViewer? GetResultsScrollViewer()
+    {
+        try
+        {
+            if (System.Windows.Media.VisualTreeHelper.GetChildrenCount(ResultsList) == 0) return null;
+            var deco = System.Windows.Media.VisualTreeHelper.GetChild(ResultsList, 0) as Decorator;
+            return deco?.Child as ScrollViewer;
+        }
+        catch { return null; }
+    }
+
+    private void ClearResultSelectionFast()
+    {
+        if (ResultsList.SelectedItems.Count == 0) return;
+
+        // 해제 중에는 선택 요약 계산을 멈춘다.
+        // (WPF가 해제 과정에서 SelectionChanged를 여러 번 발생시키는데,
+        //  그때마다 남은 선택을 다시 합산하면 수십만 건에서 사실상 멈춘다)
+        int n = ResultsList.SelectedItems.Count;
+
+        _selectionSummaryTimer?.Stop();   // 대기 중인 갱신 취소
+        _suppressSelectionSummary = true;
+        try
+        {
+            if (n > 2000 && ResultsList.ItemsSource is List<SearchResultRow> rows)
+            {
+                // 대량 선택: WPF에게 하나씩 해제시키면(UnselectAll·SelectionMode 전환 모두)
+                // 수십만 건에서 UI가 멈춘다. 목록을 다시 붙여 선택을 통째로 버리고
+                // 스크롤 위치만 복원한다.
+                var sv = GetResultsScrollViewer();
+                double offset = sv?.VerticalOffset ?? 0;
+
+                ResultsList.ItemsSource = null;
+                ResultsList.ItemsSource = rows;
+
+                if (sv is not null && offset > 0)
+                    _ = Dispatcher.BeginInvoke(new Action(() => sv.ScrollToVerticalOffset(offset)),
+                            System.Windows.Threading.DispatcherPriority.Loaded);
+            }
+            else
+            {
+                ResultsList.UnselectAll();
+            }
+        }
+        finally
+        {
+            _suppressSelectionSummary = false;
+        }
+
+        UpdateSelectionSummary();   // 마지막에 한 번만 갱신
+    }
+
+    private bool _suppressSelectionSummary;
+
+    // 선택이 아주 많으면 크기 합산을 생략하고 개수만 표시한다.
+    // (수십만 건 합산은 UI를 멈추게 하고, 그 규모에서 총 크기는 실사용 가치가 낮다)
+    private const int SelectionSummarySizeLimit = 20_000;
+
+    // Ctrl+A처럼 선택이 한 번에 크게 바뀌면 SelectionChanged가 연달아 올 수 있어,
+    // 짧게 모아서(디바운스) 마지막에 한 번만 계산한다.
+    private System.Windows.Threading.DispatcherTimer? _selectionSummaryTimer;
+
     private void ResultsList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (_suppressSelectionSummary) return;
+
+        if (_selectionSummaryTimer is null)
+        {
+            _selectionSummaryTimer = new System.Windows.Threading.DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(120)
+            };
+            _selectionSummaryTimer.Tick += (_, _) =>
+            {
+                _selectionSummaryTimer!.Stop();
+                UpdateSelectionSummary();
+            };
+        }
+
+        _selectionSummaryTimer.Stop();
+        _selectionSummaryTimer.Start();
+    }
+
+    // 하단 선택 요약("N개 선택, 총 크기") 갱신. 선택이 없으면 이전 문구로 복원.
+    private void UpdateSelectionSummary()
     {
         int n = ResultsList.SelectedItems.Count;
         if (n == 0)
@@ -1643,6 +1755,13 @@ public partial class MainWindow : Window
         }
 
         _footerBeforeSelection ??= FooterText.Text;   // 처음 선택될 때의 문구를 기억
+
+        if (n > SelectionSummarySizeLimit)
+        {
+            // 너무 많으면 개수만 (합산 생략)
+            FooterText.Text = string.Format(Loc.T("status.selectedMany"), n);
+            return;
+        }
 
         long total = 0;
         foreach (var it in ResultsList.SelectedItems)
@@ -1689,7 +1808,7 @@ public partial class MainWindow : Window
         // (다음 Esc부터는 검색창 쪽 단계 동작: 검색어 지우기 → 트레이로)
         if (e.Key == Key.Escape)
         {
-            ResultsList.UnselectAll();
+            ClearResultSelectionFast();
             SearchBox.Focus();
             e.Handled = true;
             return;
@@ -2608,6 +2727,7 @@ public partial class MainWindow : Window
                 _settings.WinWidth = b.Width;
                 _settings.WinHeight = b.Height;
                 _settings.WinMaximized = WindowState == WindowState.Maximized;
+                _settings.LastSearchQuery = SearchBox.Text;   // 마지막 검색어 (복원 설정이 켜져 있을 때 사용)
                 _settings.Save();
             }
         }

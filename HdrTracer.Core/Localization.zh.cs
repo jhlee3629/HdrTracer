@@ -95,7 +95,7 @@ public static partial class Localization
         ["filter.kind.file"]   = "仅文件",
 
         // 컬럼·상태
-        ["col.drive"]  = "驱动器",
+        ["col.drive"]  = "盘符",
         ["col.name"]   = "名称",
         ["col.path"]   = "路径",
         ["col.size"]   = "大小",
@@ -106,6 +106,7 @@ public static partial class Localization
         ["status.results"]          = "个结果",
         ["status.refreshDone"]      = "索引刷新完成",
         ["status.selected"]         = "已选择 {0} 个，{1}",
+        ["status.selectedMany"]     = "已选择 {0:N0} 个",
         ["status.indexingProgress"] = "正在索引… 已用 {0} 秒  ·  {1}",
         ["status.driveDone"]        = "{0} 完成({1:N0})",
         ["status.driveWorking"]     = "{0} 进行中",
@@ -135,7 +136,9 @@ public static partial class Localization
         ["settings.excluded"]      = "搜索时排除的文件夹名称",
         ["settings.excluded.desc"] = "用分号 (;) 分隔。这些名称的文件夹及其中的所有内容都会从结果中隐藏。例如：WinSxS; node_modules",
         ["settings.hotkey"]        = "全局快捷键 (Win+Alt+S)",
-        ["settings.hotkey.desc"]   = "在任何应用中按 Win+Alt+S 调出窗口，再按一次隐藏到托盘。",
+        ["settings.hotkey.desc"]   = "在任何应用中按 Win+Alt+S 调出窗口。按 Esc 可隐藏。",
+        ["settings.restoreSearch"]      = "启动时恢复上次的搜索",
+        ["settings.restoreSearch.desc"] = "重新打开应用时，会以上次使用的搜索词直接显示结果。",
         ["hotkey.fail"]            = "注册全局快捷键 (Win+Alt+S) 失败 — 可能已被其他程序占用。",
 
         // 단축키 창
@@ -149,7 +152,7 @@ public static partial class Localization
         ["sc.searchBox"]    = "搜索框",
         ["sc.pinnedSearch"] = "运行固定的搜索（从上往下 1–9）",
         ["sc.focusSearch"]  = "聚焦搜索框",
-        ["sc.clearSearch"]  = "清空搜索",
+        ["sc.clearSearch"]  = "清空搜索（再按一次隐藏到托盘）",
         ["sc.gotoResults"]  = "移动到结果列表",
         ["sc.resultList"]   = "结果列表",
         ["sc.openItem"]     = "打开所选项目",
@@ -161,8 +164,8 @@ public static partial class Localization
         ["sc.backToSearch"] = "返回搜索框",
         ["sc.dblClick"]     = "双击",
         ["sc.globalSc"]     = "全局快捷键",
-        ["sc.toggleApp"]    = "在任何位置显示/隐藏应用",
-        ["sc.globalHotkey"] = "显示 / 隐藏窗口（在任何应用中都有效）",
+        ["sc.toggleApp"]    = "从任何位置调出窗口（按 Esc 隐藏）",
+        ["sc.globalHotkey"] = "将窗口调到前面（在任何应用中都有效）",
         ["sc.searchTips"]   = "搜索提示",
         ["sc.tip1"]         = "用空格分隔多个词，可查找同时包含所有词的结果（AND 搜索）。",
         ["sc.tip2"]         = "韩文 2 个字符以上、英文 3 个字符以上可使用 N-gram 快速搜索。",
