@@ -215,9 +215,43 @@ public partial class MainWindow : Window
         var src = (HwndSource)PresentationSource.FromVisual(this)!;
         _watcher.AttachTo(src);
 
+        // 작업 표시줄 준비 알림(TaskbarCreated) 구독.
+        // 자동 실행으로 로그인 직후 시작하면 탐색기(작업 표시줄)가 아직 준비 전이라
+        // 작업 표시줄 단추에 아이콘이 안 붙는 경우가 있다. 준비되면 다시 등록한다.
+        // (탐색기가 재시작될 때도 같은 알림이 오므로 그때도 복구된다)
+        _taskbarCreatedMsg = RegisterWindowMessage("TaskbarCreated");
+        src.AddHook(TaskbarCreatedHook);
+
         // 글로벌 단축키 (Win + Alt + S) — 설정에서 켠 경우에만 등록 (기본 켜짐)
         if (_settings.GlobalHotkeyEnabled)
             RegisterGlobalHotkey();
+    }
+
+    private uint _taskbarCreatedMsg;
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+    private static extern uint RegisterWindowMessage(string lpString);
+
+    private IntPtr TaskbarCreatedHook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if (_taskbarCreatedMsg != 0 && (uint)msg == _taskbarCreatedMsg)
+        {
+            // 작업 표시줄 단추를 다시 만들게 해서 아이콘이 붙도록 한다
+            _ = Dispatcher.BeginInvoke(new Action(RefreshTaskbarButton),
+                    System.Windows.Threading.DispatcherPriority.Background);
+        }
+        return IntPtr.Zero;
+    }
+
+    private void RefreshTaskbarButton()
+    {
+        try
+        {
+            bool wasVisible = Visibility == Visibility.Visible;
+            ShowInTaskbar = false;
+            ShowInTaskbar = wasVisible;   // 숨어 있는 상태(트레이)면 단추를 만들지 않는다
+        }
+        catch { /* 실패해도 앱 동작에는 영향 없음 */ }
     }
 
     /// <summary>전역 단축키(Win+Alt+S)를 등록. 실패하면(다른 앱과 충돌 등) 하단에 안내.</summary>

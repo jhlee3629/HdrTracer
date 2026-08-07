@@ -6,8 +6,8 @@
 ; ============================================================
 
 #define MyAppName "HdrTracer"
-#define MyAppVersion "1.2.0"
-#define MyAppPublisher "HdrTracer"
+#define MyAppVersion "1.2.1"
+#define MyAppPublisher "HaeDream"
 #define MyAppExeName "HdrTracer.exe"
 
 ; 게시(publish)된 exe가 있는 폴더
@@ -17,6 +17,8 @@
 #define OutputDir "D:\VSCWorkSpace\HdrTracer_C#\Installer"
 
 [Setup]
+VersionInfoCompany={#MyAppPublisher}
+VersionInfoDescription={#MyAppName} Setup
 ; AppId는 이 앱을 고유하게 식별하는 GUID. 업데이트 설치/제거 추적에 사용됨.
 ; 한 번 정하면 바꾸지 마세요. (아래는 이 앱 전용으로 고정)
 AppId={{8B5F3A2C-7D14-4E9B-A6F1-2C3D4E5F6A7B}

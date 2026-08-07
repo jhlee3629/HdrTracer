@@ -184,12 +184,12 @@ public sealed class TrayIconHelper : IDisposable
     /// </summary>
     public void ToggleWindow()
     {
-        IntPtr hWnd = new WindowInteropHelper(_window).Handle;
-        bool isForeground = hWnd != IntPtr.Zero && Native.GetForegroundWindow() == hWnd;
-
+        // 트레이 아이콘 클릭용 토글: 화면에 보이면 숨기고, 아니면 띄운다.
+        // "맨 앞인가(GetForegroundWindow)"는 여기서 쓰지 않는다 —
+        // 트레이를 클릭하는 순간 포그라운드가 작업 표시줄로 넘어가서
+        // 보이는 창도 "숨은 것"으로 판정돼 숨겨지지 않는다.
         bool visibleAndUp = _window.Visibility == Visibility.Visible
-                            && _window.WindowState != WindowState.Minimized
-                            && isForeground;
+                            && _window.WindowState != WindowState.Minimized;
 
         if (visibleAndUp)
             HideWindow();

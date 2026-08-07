@@ -21,9 +21,9 @@
     <Description>NTFS 파일 검색 도구</Description>
     <Company>HaeDream</Company>
     <Copyright>Copyright © 2026</Copyright>
-    <Version>1.2.0</Version>
-    <AssemblyVersion>1.2.0.0</AssemblyVersion>
-    <FileVersion>1.2.0.0</FileVersion>
+    <Version>1.2.1</Version>
+    <AssemblyVersion>1.2.1.0</AssemblyVersion>
+    <FileVersion>1.2.1.0</FileVersion>
 
     <!-- 단일 exe 배포 빌드 옵션 (dotnet publish 명령에서만 의미 있음) -->
     <PublishSingleFile>true</PublishSingleFile>

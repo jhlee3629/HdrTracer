@@ -120,7 +120,8 @@
                     <TextBlock x:Name="UsbDesc" Text="USB 드라이브의 파일도 검색에 포함합니다."
                             Foreground="#888"
                             FontSize="11"
-                            Margin="0,2,0,0"/>
+                            Margin="0,2,0,0"
+                            TextWrapping="Wrap"/>
                 </StackPanel>
                 <CheckBox Grid.Column="1"
                         x:Name="RemovableCheckBox"
@@ -143,7 +144,8 @@
                     <TextBlock x:Name="TrayDesc" Text="X 버튼이 종료 대신 트레이로 보냅니다. 진짜 종료는 트레이 우클릭."
                             Foreground="#888"
                             FontSize="11"
-                            Margin="0,2,0,0"/>
+                            Margin="0,2,0,0"
+                            TextWrapping="Wrap"/>
                 </StackPanel>
                 <CheckBox Grid.Column="1"
                         x:Name="TrayCheckBox"
