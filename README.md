@@ -12,7 +12,7 @@ English | [한국어](README.ko.md)
 
 <img src="docs/3.png" width="700" alt="Search results with a folder filter">
 
-*Search results — `thumb D:\Backup\photos\`*
+*Search results*
 
 A fast file search tool for Windows that finds files on NTFS drives by name.
 
