@@ -134,6 +134,16 @@ public partial class MainWindow : Window
 
         // 앱 첫 활성화 시 검색창에 키보드 포커스 강제 (UAC 거친 시작에서 포커스가 가지 않는 문제 백업).
         // 1회만 발동, 그 이후 활성화에는 영향 없음.
+        // 다른 앱으로 전환할 때 대량 선택은 미리 정리한다.
+        // WPF는 창 활성/비활성 때 선택 항목의 강조 상태를 항목 수만큼 갱신하는데,
+        // 수십만 건이 선택돼 있으면 그 처리만으로 앱이 멈춘 것처럼 보인다.
+        // (수천 건 이하는 그대로 두어 평소 작업 흐름은 유지)
+        Deactivated += (_, _) =>
+        {
+            if (ResultsList.SelectedItems.Count > 2000)
+                ClearResultSelectionFast();
+        };
+
         bool firstActivated = false;
         Activated += (_, _) =>
         {
@@ -228,6 +238,7 @@ public partial class MainWindow : Window
     }
 
     private uint _taskbarCreatedMsg;
+    private bool _scrollBarSizerAttached;
 
     [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
     private static extern uint RegisterWindowMessage(string lpString);
@@ -833,6 +844,9 @@ public partial class MainWindow : Window
         HistoryList.ItemsSource = null;
         HistoryList.ItemsSource = items;
         HistoryPopup.IsOpen = true;
+
+        _ = Dispatcher.BeginInvoke(new Action(AttachHistoryScrollBarSizer),
+                System.Windows.Threading.DispatcherPriority.Loaded);
     }
 
     // WPF Popup은 창 이동을 자동으로 따라오지 않음 → 오프셋을 살짝 바꿨다 되돌려 위치 재계산 유도
@@ -927,7 +941,7 @@ public partial class MainWindow : Window
 
         if (string.IsNullOrWhiteSpace(query) || indexes.Count == 0)
         {
-            ResultsList.ItemsSource = null;
+            SetResultRows(null);
             EmptyHint.Visibility = Visibility.Collapsed;
             UpdateFooterSummary();
             return;
@@ -999,7 +1013,7 @@ public partial class MainWindow : Window
 
             // 4) UI 즉시 표시
             sw.Stop();
-            ResultsList.ItemsSource = sortedRows;
+            SetResultRows(sortedRows);
             EmptyHint.Visibility = sortedRows.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
             _lastSearchQuery = query;
 
@@ -1028,6 +1042,13 @@ public partial class MainWindow : Window
             // "가만히 있는데 시간이 바뀌는" 현상을 막는다.
             if (!isAuto)
                 _lastSearchMs = sw.ElapsedMilliseconds;
+
+            if (!_scrollBarSizerAttached)
+            {
+                _scrollBarSizerAttached = true;
+                _ = Dispatcher.BeginInvoke(new Action(AttachScrollBarSizer),
+                        System.Windows.Threading.DispatcherPriority.Loaded);
+            }
 
             // 직접 검색은 즉시 갱신. 자동 재검색은 최근 알림(삭제 결과 등)을 3초간 존중.
             if (!isAuto || DateTime.UtcNow >= _footerNoticeUntil)
@@ -1111,7 +1132,7 @@ public partial class MainWindow : Window
                 var reversed = new List<SearchResultRow>(currentRows.Count);
                 for (int i = currentRows.Count - 1; i >= 0; i--)
                     reversed.Add(currentRows[i]);
-                ResultsList.ItemsSource = reversed;
+                SetResultRows(reversed);
             }
             else
             {
@@ -1121,7 +1142,7 @@ public partial class MainWindow : Window
                 try
                 {
                     var sorted = await Task.Run(() => SortRows(currentRows));
-                    ResultsList.ItemsSource = sorted;
+                    SetResultRows(sorted);
                 }
                 finally
                 {
@@ -1137,7 +1158,8 @@ public partial class MainWindow : Window
     {
         if (e.OriginalSource is not ScrollViewer sv) return;
 
-        double w = sv.ComputedVerticalScrollBarVisibility == Visibility.Visible ? 16 : 0;
+        // 보정값은 스크롤바 실제 폭과 같아야 한다 (DarkScrollBar 스타일의 Width=11)
+        double w = sv.ComputedVerticalScrollBarVisibility == Visibility.Visible ? 11 : 0;
         var lastCol = HeaderGrid.ColumnDefinitions[^1];
         if (lastCol.Width.Value != w)
             lastCol.Width = new GridLength(w);
@@ -1535,6 +1557,7 @@ public partial class MainWindow : Window
             }
             else if (!string.IsNullOrEmpty(SearchBox.Text))
             {
+                ClearResultSelectionFast();   // 선택이 많으면 먼저 빠르게 해제
                 SearchBox.Clear();
                 RunSearch();          // 빈 검색 상태로 정리 (목록 비움 + 드라이브 요약)
             }
@@ -1691,6 +1714,42 @@ public partial class MainWindow : Window
     // WPF의 UnselectAll()은 선택 항목이 수만~수십만 개면 해제 목록을 통째로 만들며
     // UI가 몇 초간 멈춘다(응답 없음). 그 경우에는 목록을 다시 바인딩해 즉시 해제하고,
     // 스크롤 위치는 그대로 복원한다. 소량이면 기존 방식 그대로.
+    // 히스토리 팝업의 세로 스크롤바에도 같은 손잡이 계산기를 붙인다 (스타일 통일).
+    private bool _historySizerAttached;
+
+    private void AttachHistoryScrollBarSizer()
+    {
+        if (_historySizerAttached) return;
+        try
+        {
+            HistoryList.ApplyTemplate();
+            var sv = FindVisualChild<ScrollViewer>(HistoryList);
+            if (sv is null) return;
+            sv.ApplyTemplate();
+            if (sv.Template.FindName("PART_VerticalScrollBar", sv) is System.Windows.Controls.Primitives.ScrollBar vbar)
+            {
+                ScrollBarThumbSizer.Attach(vbar, sv);
+                _historySizerAttached = true;
+            }
+        }
+        catch { /* 실패해도 기본 스크롤 동작에는 영향 없음 */ }
+    }
+
+    // 결과 목록의 세로 스크롤바에 손잡이 크기 계산기를 붙인다.
+    // (템플릿이 적용된 뒤여야 찾을 수 있으므로 Loaded 이후에 호출)
+    private void AttachScrollBarSizer()
+    {
+        try
+        {
+            var sv = GetResultsScrollViewer();
+            if (sv is null) return;
+            sv.ApplyTemplate();
+            if (sv.Template.FindName("PART_VerticalScrollBar", sv) is System.Windows.Controls.Primitives.ScrollBar vbar)
+                ScrollBarThumbSizer.Attach(vbar, sv);
+        }
+        catch { /* 실패해도 기본 스크롤 동작에는 영향 없음 */ }
+    }
+
     private ScrollViewer? GetResultsScrollViewer()
     {
         try
@@ -1700,6 +1759,30 @@ public partial class MainWindow : Window
             return deco?.Child as ScrollViewer;
         }
         catch { return null; }
+    }
+
+    /// <summary>
+    /// 결과 목록을 새 목록으로 교체한다.
+    /// 선택이 많은 상태에서 곧바로 다른 목록을 붙이면 WPF가 선택 항목을 하나씩 정리하며
+    /// UI가 멈춘다(수십만 건). 먼저 null로 비워 선택을 통째로 버리고, 그동안 요약 계산도 멈춘다.
+    /// </summary>
+    private void SetResultRows(List<SearchResultRow>? rows)
+    {
+        bool many = ResultsList.SelectedItems.Count > 2000;
+
+        _selectionSummaryTimer?.Stop();
+        _suppressSelectionSummary = true;
+        try
+        {
+            if (many) ResultsList.ItemsSource = null;
+            ResultsList.ItemsSource = rows;
+        }
+        finally
+        {
+            _suppressSelectionSummary = false;
+        }
+
+        UpdateSelectionSummary();
     }
 
     private void ClearResultSelectionFast()
@@ -2601,8 +2684,7 @@ public partial class MainWindow : Window
             {
                 foreach (var p in deletedPaths) _recentlyDeletedPaths.Add(p);
                 var remaining = shown.Where(r => !deletedPaths.Contains(r.Path)).ToList();
-                ResultsList.ItemsSource = null;
-                ResultsList.ItemsSource = remaining;
+                SetResultRows(remaining);
             }
         }
     }
@@ -3094,7 +3176,7 @@ public partial class MainWindow : Window
             // ── UI 즉시 반응 ──
             _searchCts?.Cancel();
             SearchBox.Clear();
-            ResultsList.ItemsSource = null;
+            SetResultRows(null);
             SearchBox.IsEnabled = false;
             StatusBanner.Visibility = Visibility.Visible;
             StatusText.Text = Loc.T("status.indexing");

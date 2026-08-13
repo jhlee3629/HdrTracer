@@ -3,7 +3,6 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Name="RootWindow"
         Title="HdrTracer"
-        Icon="Assets/sun.ico"
         Height="600" Width="900"
         MinHeight="350" MinWidth="600"
         WindowStartupLocation="CenterScreen"
@@ -13,6 +12,110 @@
         Closed="MainWindow_Closed"
         Closing="MainWindow_Closing"
         PreviewMouseWheel="Window_PreviewMouseWheel">
+
+    <Window.Resources>
+        <!-- 결과 목록 스크롤바: 앱 다크 팔레트에 맞춘 얇은 디자인.
+             기본 Windows 스크롤바(밝은 회색 + 화살표 버튼)가 창과 겉돌아 직접 그린다. -->
+        <!-- 결과 목록 스크롤바: 앱 다크 팔레트에 맞춘 얇은 디자인.
+             Track이 계산하는 손잡이 크기는 항목이 많으면 몇 px까지 작아지고
+             MinHeight로도 늘어나지 않아, Track을 쓰지 않고 손잡이를 직접 배치한다. -->
+        <!-- 스크롤바 화살표(위/아래): 폭 11px에 맞춘 작은 기호 -->
+        <Style x:Key="DarkScrollArrow" TargetType="RepeatButton">
+            <Setter Property="OverridesDefaultStyle" Value="True"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="IsTabStop" Value="False"/>
+            <Setter Property="Height" Value="15"/>
+            <Setter Property="FontSize" Value="9"/>
+            <Setter Property="Foreground" Value="#7A7A82"/>
+            <Setter Property="Delay" Value="300"/>
+            <Setter Property="Interval" Value="50"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RepeatButton">
+                        <Border x:Name="Bg" Background="Transparent">
+                            <TextBlock x:Name="Glyph"
+                                       Text="{TemplateBinding Content}"
+                                       Foreground="{TemplateBinding Foreground}"
+                                       FontSize="{TemplateBinding FontSize}"
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Glyph" Property="Foreground" Value="#B0B0B8"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Glyph" Property="Foreground" Value="#E8E8EC"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="DarkScrollBarThumb" TargetType="Thumb">
+            <Setter Property="OverridesDefaultStyle" Value="True"/>
+            <Setter Property="IsTabStop" Value="False"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Thumb">
+                        <Border x:Name="Bar"
+                                Background="#585860"
+                                CornerRadius="4"
+                                Margin="2,0,2,0"
+                                SnapsToDevicePixels="True"/>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bar" Property="Background" Value="#6E6E76"/>
+                            </Trigger>
+                            <Trigger Property="IsDragging" Value="True">
+                                <Setter TargetName="Bar" Property="Background" Value="#8A8A90"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="DarkScrollBar" TargetType="ScrollBar">
+            <Setter Property="OverridesDefaultStyle" Value="True"/>
+            <Setter Property="Width" Value="11"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ScrollBar">
+                        <Grid x:Name="Root" Background="{TemplateBinding Background}">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <!-- 위 화살표 -->
+                            <RepeatButton x:Name="PART_LineUpCustom" Grid.Row="0"
+                                          Style="{StaticResource DarkScrollArrow}"
+                                          Content="&#x25B2;"/>
+
+                            <!-- 트랙 + 손잡이.
+                                 손잡이 높이·위치는 코드(ScrollBarThumbSizer)가 스크롤 상태에 맞춰 정한다. -->
+                            <Canvas x:Name="PART_TrackCanvas" Grid.Row="1" ClipToBounds="True"
+                                    Background="Transparent">
+                                <Thumb x:Name="PART_ThumbCustom"
+                                       Style="{StaticResource DarkScrollBarThumb}"
+                                       Width="{Binding ActualWidth, ElementName=Root}"/>
+                            </Canvas>
+
+                            <!-- 아래 화살표 -->
+                            <RepeatButton x:Name="PART_LineDownCustom" Grid.Row="2"
+                                          Style="{StaticResource DarkScrollArrow}"
+                                          Content="&#x25BC;"/>
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+    </Window.Resources>
 
     <Window.InputBindings>
         <KeyBinding Modifiers="Control" Key="L" Command="ApplicationCommands.Find"/>
@@ -271,6 +374,9 @@
                              MaxHeight="320"
                              ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                              SelectionChanged="HistoryList_SelectionChanged">
+                        <ListBox.Resources>
+                            <Style TargetType="ScrollBar" BasedOn="{StaticResource DarkScrollBar}"/>
+                        </ListBox.Resources>
                         <ListBox.ItemContainerStyle>
                             <Style TargetType="ListBoxItem">
                                 <Setter Property="Padding" Value="0"/>
@@ -357,7 +463,7 @@
                             <ColumnDefinition Width="{Binding Cols.Path, RelativeSource={RelativeSource AncestorType=Window}}"/>
                             <ColumnDefinition Width="{Binding Cols.Size, RelativeSource={RelativeSource AncestorType=Window}}"/>    <!-- 크기 -->
                             <ColumnDefinition Width="{Binding Cols.Date, RelativeSource={RelativeSource AncestorType=Window}}"/>   <!-- 수정 날짜 -->
-                            <ColumnDefinition Width="16"/>
+                            <ColumnDefinition Width="11"/>
                         </Grid.ColumnDefinitions>
 
                         <Grid.Resources>
@@ -496,6 +602,9 @@
                             ContextMenuOpening="ResultsList_ContextMenuOpening"
                             PreviewKeyDown="ResultsList_KeyDown"
                             ScrollViewer.ScrollChanged="ResultsList_ScrollChanged">
+                        <ListView.Resources>
+                            <Style TargetType="ScrollBar" BasedOn="{StaticResource DarkScrollBar}"/>
+                        </ListView.Resources>
                         <ListView.InputBindings>
                             <KeyBinding Key="Enter" Command="ApplicationCommands.Open"/>
                             <KeyBinding Modifiers="Alt" Key="Enter" Command="ApplicationCommands.Properties"/>
