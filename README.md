@@ -24,13 +24,14 @@ A fast file search tool for Windows that finds files on NTFS drives by name.
 - Real-time updates via the USN journal — adding, deleting, or renaming a file is reflected in results immediately
 - Results refresh automatically when a USB drive is plugged in or removed
 - Pinned searches — pin frequent queries (📌) and run them instantly with `Ctrl+1~9`
-- Work with results — right-click (open / show in folder / search in this folder / copy path),
+- Work with results — right-click (open / show in folder / search in this folder / copy path / delete),
   drag & drop into File Explorer, export to CSV, selection count & total size in the status bar
+- Delete stubborn items — files and folders Explorer cannot handle (names ending with a space or a dot, paths over 260 characters) can be deleted directly. When a delete fails, the reason is shown along with the program holding the file
 - Excluded folders — hide system-ish folders like WinSxS or node_modules from results
 - Remembers your window size & position, column widths, and sort order
 - Lives in the tray + optional "Start with Windows" (via Task Scheduler — no UAC prompt at sign-in, off by default)
-- Global hotkey `Win + Alt + S` — summon the window from any app (press Esc to hide it; can be disabled in Settings)`
-- Dark theme, Korean / English support (first run …) → - Dark theme, 7 languages: Korean, English, Chinese (Simplified), Japanese, Spanish, German, French (first run follows your Windows display language)
+- Global hotkey `Win + Alt + S` — summon the window from any app (press Esc to hide it; can be disabled in Settings)
+- Dark theme, 7 languages: Korean, English, Chinese (Simplified), Japanese, Spanish, German, French (first run follows your Windows display language)
 
 ## Requirements
 
@@ -71,7 +72,8 @@ The .NET runtime is bundled, so there is nothing else to install.
 | `photo D:\Backup\` | search only under that folder (wrap paths with spaces in `"quotes"`) |
 | `*.mp4 >500MB` | size condition (unit required: KB MB GB TB · works alone) |
 | `photo >2026-01` · `>week` | modified-date condition (year-month-day · today / week / month / year) |
-| `IMGedit.txt` | whole-name match incl. extension (use `IMG_edit` for any extension) |`
+| `IMG_*_edit.txt` | whole-name match incl. extension (use `IMG_*_edit*` for any extension) |
+| `project folder:` | folders only (use `file:` for files only) |
 
 Full details: app menu (HdrTracer ▼) → Search help.
 
@@ -79,6 +81,20 @@ Full details: app menu (HdrTracer ▼) → Search help.
 
 Click the search box to see recent searches. Pin one with the 📌 button to keep it at the
 top of the list, and run pinned searches instantly with `Ctrl+1~9` (top to bottom).
+
+### Deleting files
+
+Right-click a result → **Move to Recycle Bin**. Normal files go to the Recycle Bin and can be
+restored.
+
+Items Explorer cannot handle — names ending with a space or a dot, or paths over 260
+characters — cannot be sent to the Recycle Bin. For these, HdrTracer asks for a separate
+confirmation and then deletes them permanently. **Nothing is ever permanently deleted without
+that confirmation**, and protected system paths (Windows, Program Files, etc.) are never
+escalated to permanent delete.
+
+When a delete fails, the reason is shown — in use by another program, access denied, invalid
+name or path, and so on — together with the name and PID of the program holding the item.
 
 ### Hidden / system items
 
@@ -94,6 +110,8 @@ settings to include them.
 - Show hidden/system items
 - Folder names to exclude from search (e.g. `WinSxS; node_modules`)
 - Start with Windows (registered via Task Scheduler — runs at sign-in without a UAC prompt, off by default)
+- Global hotkey on/off
+- Restore the last search on startup
 
 ## Privacy & data
 
@@ -108,7 +126,11 @@ settings to include them.
 - NTFS only. Other file systems are not indexed.
 - No file content search. Only names and paths are searched.
 - SmartScreen warning appears because the build is not code-signed.
-- Deletion moves items to the Recycle Bin (recoverable), not a permanent delete. If system-critical paths are included, an extra warning is shown before deleting.
+- Deletion moves items to the Recycle Bin by default. Items that cannot be sent there are
+  permanently deleted only after a separate confirmation. If system-critical paths are
+  included, an extra warning is shown before deleting.
+- Locked files and files you do not own cannot be deleted. The reason is shown instead —
+  HdrTracer does not force ownership changes or terminate processes.
 
 ## License
 
