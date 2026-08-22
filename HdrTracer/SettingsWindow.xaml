@@ -20,7 +20,6 @@
     </WindowChrome.WindowChrome>
 
     <Window.Resources>
-        <!-- Tab 포커스 표시: 어두운 테마에서도 잘 보이는 밝은 사각형 -->
         <Style x:Key="BrightFocusVisual">
             <Setter Property="Control.Template">
                 <Setter.Value>
@@ -36,8 +35,6 @@
             </Setter>
         </Style>
 
-        <!-- 창 가장자리 버튼(닫기)용: 포커스 사각형을 컨트롤 "안쪽"에 그린다.
-             바깥(-3)에 그리면 창 경계에서 잘리거나 보이지 않는다. -->
         <Style x:Key="InnerFocusVisual">
             <Setter Property="Control.Template">
                 <Setter.Value>
@@ -107,7 +104,6 @@
                     Foreground="#CCCCCC"
                     Margin="0,0,0,12"/>
 
-            <!-- USB 토글 -->
             <Grid Grid.Row="1">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -131,7 +127,6 @@
                         Click="RemovableCheckBox_Click"/>
             </Grid>
 
-            <!-- 트레이 토글 (새로 추가) -->
             <Grid Grid.Row="2" Margin="0,16,0,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -154,7 +149,6 @@
                         FocusVisualStyle="{StaticResource BrightFocusVisual}"/>
             </Grid>
 
-            <!-- 숨김+시스템 항목 표시 토글 -->
             <Grid Grid.Row="3" Margin="0,16,0,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -177,7 +171,6 @@
                         FocusVisualStyle="{StaticResource BrightFocusVisual}"/>
             </Grid>
 
-            <!-- Windows 시작 시 자동 실행 토글 -->
             <Grid Grid.Row="4" Margin="0,16,0,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -200,7 +193,6 @@
                         FocusVisualStyle="{StaticResource BrightFocusVisual}"/>
             </Grid>
 
-            <!-- 전역 단축키 토글 -->
             <Grid Grid.Row="5" Margin="0,16,0,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -223,7 +215,6 @@
                         FocusVisualStyle="{StaticResource BrightFocusVisual}"/>
             </Grid>
 
-            <!-- 시작 시 마지막 검색어 복원 -->
             <Grid Grid.Row="6" Margin="0,16,0,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -246,7 +237,6 @@
                         FocusVisualStyle="{StaticResource BrightFocusVisual}"/>
             </Grid>
 
-            <!-- 검색 제외 폴더 이름 -->
             <StackPanel Grid.Row="7" Margin="0,16,0,0">
                 <TextBlock x:Name="ExcludedTitle" Text="검색에서 제외할 폴더 이름"
                         Foreground="White"
@@ -274,7 +264,6 @@
                     TextWrapping="Wrap"/>
         </Grid>
 
-        <!-- 하단 버튼 -->
         <Border Grid.Row="2" Background="#252526" Padding="20,8">
             <Grid>
                 <Button x:Name="OkButton"

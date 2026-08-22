@@ -16,10 +16,8 @@ public partial class SettingsWindow : Window
     private readonly string _initialExcluded;
     private readonly bool _initialHotkey;
 
-    /// <summary>전역 단축키 토글이 바뀌었는지 (호출측이 등록/해제에 사용)</summary>
     public bool HotkeyChanged { get; private set; }
 
-    /// <summary>제외 폴더 목록이 바뀌었는지 (호출측이 엔진 반영·재검색에 사용)</summary>
     public bool ExcludedChanged { get; private set; }
 
     public SettingsWindow(AppSettings settings)
@@ -29,7 +27,7 @@ public partial class SettingsWindow : Window
         _initialRemovable = settings.IndexRemovableDrives;
         _initialShowHidden = settings.ShowHiddenSystemItems;
         RemovableCheckBox.IsChecked = settings.IndexRemovableDrives;
-        _initialAutoStart = AutoStartManager.IsRegistered();   // 실제 등록 상태를 조회해 표시
+        _initialAutoStart = AutoStartManager.IsRegistered();   
         AutoStartCheckBox.IsChecked = _initialAutoStart;
         ExcludedBox.Text = string.Join("; ", settings.ExcludedFolders);
         _initialExcluded = NormalizeExcluded(ExcludedBox.Text);
@@ -41,7 +39,6 @@ public partial class SettingsWindow : Window
 
         ApplyTexts();
 
-        // Esc로 취소, Enter로 확인
         PreviewKeyDown += (_, e) =>
         {
             if (e.Key == System.Windows.Input.Key.Escape)
@@ -122,7 +119,6 @@ public partial class SettingsWindow : Window
 
         Settings.MinimizeToTrayOnClose = TrayCheckBox.IsChecked ?? false;
 
-        // 제외 폴더 이름 파싱 (세미콜론 구분, 공백 제거, 빈 항목 제외)
         var excluded = new List<string>();
         foreach (var part in ExcludedBox.Text.Split(';'))
         {
@@ -139,7 +135,6 @@ public partial class SettingsWindow : Window
 
         Settings.Save();
 
-        // 자동 실행: 바뀐 경우에만 스케줄러 등록/해제
         bool autoStart = AutoStartCheckBox.IsChecked ?? false;
         if (autoStart != _initialAutoStart)
         {

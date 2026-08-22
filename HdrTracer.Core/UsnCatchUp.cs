@@ -3,16 +3,10 @@ using Microsoft.Win32.SafeHandles;
 
 namespace HdrTracer.Core;
 
-/// <summary>
-/// 캐시된 인덱스를 로드한 후, 마지막 USN부터 현재까지의
-/// 파일 시스템 변경분을 적용한다.
-/// </summary>
 public static class UsnCatchUp
 {
-    /// <summary>변경분을 적용하고 (새 LastUsn, 변경 건수)를 반환.</summary>
     public static (long NewLastUsn, int Changes) Apply(FileIndex index, string driveLetter, ulong journalId, long fromUsn)
     {
-        // 캐시에 저널 정보가 없으면 catch-up 불가 → 풀 빌드 강제
         if (journalId == 0)
             throw new InvalidOperationException("No journal info in cache");
 
@@ -28,7 +22,6 @@ public static class UsnCatchUp
         if (handle.IsInvalid)
             throw new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error());
 
-        // Journal ID가 같은지 검증
         var jdata = new Native.USN_JOURNAL_DATA_V0();
         bool ok = Native.DeviceIoControlQuery(
             handle, Native.FSCTL_QUERY_USN_JOURNAL,
@@ -40,11 +33,9 @@ public static class UsnCatchUp
 
         if (jdata.UsnJournalID != journalId)
         {
-            // 저널이 재생성됨 → 캐시 무효
             throw new InvalidOperationException("USN Journal ID mismatch");
         }
 
-        // 저널이 너무 많이 쌓여서 fromUsn이 폐기됐는지 확인
         if (fromUsn < jdata.LowestValidUsn)
         {
             throw new InvalidOperationException("Cached USN is too old");

@@ -1,7 +1,5 @@
 namespace HdrTracer.Core;
 
-// 독일어 문자열. 번역이 빠진 키는 자동으로 영어로 대체된다.
-// 독일어는 영어보다 문구가 길어지기 쉬우므로 UI가 밀리지 않도록 간결한 표현을 쓴다.
 public static partial class Localization
 {
     internal static readonly Dictionary<string, string> _de = new()
@@ -204,5 +202,29 @@ public static partial class Localization
         ["common.error"]  = "Fehler",
         ["common.ok"]     = "OK",
         ["common.cancel"] = "Abbrechen",
+
+        ["rd.report.title"]     = "Nicht gelöschte Einträge",
+        ["rd.perm.title"]       = "Endgültig löschen",
+        ["rd.perm.msg"]         = "{0} Eintrag/Einträge können nicht in den Papierkorb verschoben werden.\n\nEndgültig löschen?\nDies kann nicht rückgängig gemacht werden.",
+        ["rd.blockedAt"]        = "Blockiert bei:",
+        ["rd.lock.unknown"]     = "Programm konnte nicht ermittelt werden (evtl. System oder Antivirus)",
+        ["rd.cause.locked"]     = "Von einem anderen Programm verwendet",
+        ["rd.cause.denied"]     = "Zugriff verweigert",
+        ["rd.cause.badname"]    = "Ungültiger Name oder Pfad",
+        ["rd.cause.notempty"]   = "Ordner ist nicht leer",
+        ["rd.cause.notfound"]   = "Bereits nicht mehr vorhanden",
+        ["rd.cause.protected"]  = "Geschützter Systempfad",
+        ["rd.cause.other"]      = "Anderer Fehler",
+        ["rd.hint.locked"]      = "Schließen Sie die oben genannten Programme und versuchen Sie es erneut.",
+        ["rd.hint.denied"]      = "Der Besitz liegt möglicherweise bei einem anderen Konto (z. B. TrustedInstaller).",
+        ["rd.hint.badname"]     = "Der Explorer kann diesen Namen nicht verarbeiten. Erlauben Sie das endgültige Löschen.",
+        ["rd.hint.notempty"]    = "Einige enthaltene Einträge wurden nicht entfernt. Siehe die anderen Ursachen oben.",
+        ["rd.hint.protected"]   = "Aus Sicherheitsgründen nicht endgültig gelöscht. Entfernen Sie es bei Bedarf im Explorer.",
+        ["rd.hint.notfound"]    = "Der Eintrag ist bereits verschwunden.",
+        ["rd.hint.other"]       = "Die Ursache konnte nicht ermittelt werden.",
+        ["dn.permOne"]          = "Endgültig gelöscht",
+        ["dn.permMulti"]        = "{0} Eintrag/Einträge endgültig gelöscht.",
+        ["dn.mixed"]            = "{0} gelöscht ({1} endgültig)",
+        ["dn.permSuffix"]       = "{0} endgültig",
     };
 }

@@ -3,14 +3,6 @@ using System.Windows;
 
 namespace HdrTracer.App;
 
-/// <summary>
-/// 헤더와 모든 결과 행이 공유하는 단일 컬럼 너비 소스.
-/// 기존 SharedSizeGroup의 "암묵적 자동 동기화"가 경로(*) 컬럼과 충돌해
-/// 검색 결과가 있을 때 드래그가 어긋나던 문제를 없애기 위해,
-/// 헤더 드래그가 이 객체의 값만 바꾸면 바인딩된 헤더·모든 행(가상화로 새로 생기는
-/// 행 포함)이 한 번에 같은 너비로 갱신된다. 경로 컬럼은 *라 바인딩하지 않아도
-/// 다른 네 컬럼이 동일하면 자동으로 같은 폭이 된다.
-/// </summary>
 public sealed class ColumnWidths : INotifyPropertyChanged
 {
     private GridLength _drive = new(50,  GridUnitType.Star);
@@ -45,7 +37,6 @@ public sealed class ColumnWidths : INotifyPropertyChanged
         set { if (_path != value) { _path = value; OnChanged(nameof(Path)); } }
     }
 
-    // 픽셀 값 편의 접근자 (드래그 로직에서 숫자로 다루기 쉽게)
     public double DrivePx => _drive.Value;
     public double NamePx  => _name.Value;
     public double SizePx  => _size.Value;

@@ -1,6 +1,5 @@
 namespace HdrTracer.Core;
 
-// 프랑스어 문자열. 번역이 빠진 키는 자동으로 영어로 대체된다.
 public static partial class Localization
 {
     internal static readonly Dictionary<string, string> _fr = new()
@@ -203,5 +202,29 @@ public static partial class Localization
         ["common.error"]  = "Erreur",
         ["common.ok"]     = "OK",
         ["common.cancel"] = "Annuler",
+
+        ["rd.report.title"]     = "Éléments non supprimés",
+        ["rd.perm.title"]       = "Suppression définitive",
+        ["rd.perm.msg"]         = "{0} élément(s) ne peuvent pas être mis à la corbeille.\n\nLes supprimer définitivement ?\nCette action est irréversible.",
+        ["rd.blockedAt"]        = "Bloqué à :",
+        ["rd.lock.unknown"]     = "Programme non identifié (peut-être le système ou l'antivirus)",
+        ["rd.cause.locked"]     = "Utilisé par un autre programme",
+        ["rd.cause.denied"]     = "Accès refusé",
+        ["rd.cause.badname"]    = "Nom ou chemin invalide",
+        ["rd.cause.notempty"]   = "Le dossier n'est pas vide",
+        ["rd.cause.notfound"]   = "Déjà absent",
+        ["rd.cause.protected"]  = "Chemin système protégé",
+        ["rd.cause.other"]      = "Autre erreur",
+        ["rd.hint.locked"]      = "Fermez les programmes indiqués ci-dessus, puis réessayez.",
+        ["rd.hint.denied"]      = "La propriété appartient peut-être à un autre compte (p. ex. TrustedInstaller).",
+        ["rd.hint.badname"]     = "L'Explorateur ne gère pas ce nom. Autorisez la suppression définitive pour le retirer.",
+        ["rd.hint.notempty"]    = "Certains éléments internes n'ont pas été supprimés. Voyez les autres causes ci-dessus.",
+        ["rd.hint.protected"]   = "Non converti en suppression définitive par sécurité. Supprimez-le depuis l'Explorateur si nécessaire.",
+        ["rd.hint.notfound"]    = "L'élément a déjà disparu.",
+        ["rd.hint.other"]       = "La cause n'a pas pu être déterminée.",
+        ["dn.permOne"]          = "Supprimé définitivement",
+        ["dn.permMulti"]        = "{0} élément(s) supprimé(s) définitivement.",
+        ["dn.mixed"]            = "{0} supprimé(s) (dont {1} définitivement)",
+        ["dn.permSuffix"]       = "{0} définitivement",
     };
 }

@@ -1,9 +1,5 @@
 namespace HdrTracer.Core;
 
-/// <summary>
-/// 여러 드라이브의 FileIndex를 묶어서 관리하는 Facade.
-/// 슬롯의 동적 추가/제거를 지원한다.
-/// </summary>
 public sealed class MultiDriveIndex
 {
     public sealed class DriveSlot
@@ -18,7 +14,6 @@ public sealed class MultiDriveIndex
     private readonly List<DriveSlot> _slots = new();
     private readonly object _lock = new();
 
-    /// <summary>드라이브 슬롯이 추가/제거될 때 발생.</summary>
     public event Action? SlotsChanged;
 
     public IReadOnlyList<DriveSlot> Slots
@@ -62,7 +57,6 @@ public sealed class MultiDriveIndex
         SlotsChanged?.Invoke();
     }
 
-    /// <summary>지정한 드라이브를 제거하고 그 슬롯의 모니터/인덱스를 정리한다.</summary>
     public void RemoveDrive(string driveLetter)
     {
         DriveSlot? removed = null;
@@ -82,7 +76,6 @@ public sealed class MultiDriveIndex
         if (removed is not null)
         {
             try { removed.Monitor?.Dispose(); } catch { }
-            // FileIndex 자체는 GC에 맡김 (배열 두 개라 곧 해제됨)
             SlotsChanged?.Invoke();
         }
     }

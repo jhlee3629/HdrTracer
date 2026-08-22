@@ -25,7 +25,6 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <!-- 타이틀바 -->
         <Grid Grid.Row="0" Background="#252526">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
@@ -46,14 +45,12 @@
                     WindowChrome.IsHitTestVisibleInChrome="True"/>
         </Grid>
 
-        <!-- 본문 -->
         <Grid Grid.Row="1" Margin="24,20,24,20">
             <Grid.RowDefinitions>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
-            <!-- 앱 이름 + 아이콘 -->
             <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
                 <Image Source="/Assets/sun.ico" Width="32" Height="32" Margin="0,0,12,0"/>
                 <StackPanel VerticalAlignment="Center">
@@ -68,7 +65,6 @@
                 </StackPanel>
             </StackPanel>
 
-            <!-- 설명 -->
             <TextBlock Grid.Row="1"
                        x:Name="DescText"
                        Text="NTFS 파일 시스템을 직접 읽어 빠르게 검색하는 도구입니다."

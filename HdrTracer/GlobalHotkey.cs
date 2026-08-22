@@ -4,10 +4,6 @@ using System.Windows.Interop;
 
 namespace HdrTracer.App;
 
-/// <summary>
-/// Windows 시스템 전역 단축키.
-/// RegisterHotKey API를 사용하여 어디서든 키 입력을 받는다.
-/// </summary>
 public sealed class GlobalHotkey : IDisposable
 {
     [Flags]
@@ -41,15 +37,12 @@ public sealed class GlobalHotkey : IDisposable
         _window = window;
     }
 
-    /// <summary>단축키 등록. virtualKey는 System.Windows.Forms.Keys 또는 win32 vk 코드.</summary>
     public bool Register(Modifiers modifiers, uint virtualKey)
     {
-        // 윈도우 핸들이 만들어진 후에야 메시지 후킹 가능
         var helper = new WindowInteropHelper(_window);
         _hwnd = helper.Handle;
         if (_hwnd == IntPtr.Zero)
         {
-            // 아직 윈도우 핸들 없음 — SourceInitialized 이후 다시 시도
             return false;
         }
 

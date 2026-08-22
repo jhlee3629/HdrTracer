@@ -1,11 +1,9 @@
 namespace HdrTracer.Core;
 
-// 중국어(간체) 문자열. 번역이 빠진 키는 자동으로 영어로 대체된다.
 public static partial class Localization
 {
     internal static readonly Dictionary<string, string> _zh = new()
     {
-        // 메뉴
         ["menu.settings"]     = "设置",
         ["menu.refresh"]      = "刷新索引",
         ["menu.resetCols"]    = "重置列宽",
@@ -29,7 +27,6 @@ public static partial class Localization
         ["export.done"]       = "已将 {0} 个项目保存为 CSV。",
         ["menu.filter"]       = "筛选",
 
-        // 툴팁
         ["tip.menu"]     = "菜单",
         ["tip.minimize"] = "最小化",
         ["tip.maximize"] = "最大化",
@@ -38,12 +35,10 @@ public static partial class Localization
         ["tip.delete"]   = "删除",
         ["tip.pin"]      = "固定 / 取消固定",
 
-        // 검색창·빈 결과
         ["search.placeholder"] = "输入文件名后按 Enter",
         ["empty.title"] = "没有结果",
         ["empty.body"]  = "试试更短或不同的搜索词\n多个词只会匹配同时包含它们的项目\n帮助：菜单 (HdrTracer ▼) → 搜索帮助",
 
-        // 우클릭 메뉴
         ["ctx.open"]           = "打开",
         ["ctx.runAsAdmin"]     = "以管理员身份运行",
         ["ctx.openWith"]       = "打开方式...",
@@ -74,7 +69,6 @@ public static partial class Localization
         ["ctx.error"]          = "错误",
         ["ctx.notExecutable"]  = "不是可执行文件",
 
-        // 빠른 필터
         ["filter.doc"]         = "文档",
         ["filter.img"]         = "图片",
         ["filter.media"]       = "媒体",
@@ -94,7 +88,6 @@ public static partial class Localization
         ["filter.kind.folder"] = "仅文件夹",
         ["filter.kind.file"]   = "仅文件",
 
-        // 컬럼·상태
         ["col.drive"]  = "盘符",
         ["col.name"]   = "名称",
         ["col.path"]   = "路径",
@@ -111,14 +104,12 @@ public static partial class Localization
         ["status.driveDone"]        = "{0} 完成({1:N0})",
         ["status.driveWorking"]     = "{0} 进行中",
 
-        // 트레이
         ["tray.open"]         = "打开 HdrTracer",
         ["tray.exit"]         = "退出",
         ["tray.pinned"]       = "固定的搜索",
         ["tray.pinned.empty"] = "没有固定的搜索",
         ["tray.settings"]     = "设置",
 
-        // 설정
         ["settings.title"]     = "设置",
         ["settings.indexing"]  = "索引",
         ["settings.usb"]       = "索引可移动驱动器",
@@ -141,7 +132,6 @@ public static partial class Localization
         ["settings.restoreSearch.desc"] = "重新打开应用时，会以上次使用的搜索词直接显示结果。",
         ["hotkey.fail"]            = "注册全局快捷键 (Win+Alt+S) 失败 — 可能已被其他程序占用。",
 
-        // 단축키 창
         ["sc.title"]        = "快捷键",
         ["sc.appMenu"]      = "应用菜单",
         ["sc.openSettings"] = "打开设置",
@@ -170,7 +160,6 @@ public static partial class Localization
         ["sc.tip1"]         = "用空格分隔多个词，可查找同时包含所有词的结果（AND 搜索）。",
         ["sc.tip2"]         = "韩文 2 个字符以上、英文 3 个字符以上可使用 N-gram 快速搜索。",
 
-        // 검색 도움말
         ["help.search.title"] = "搜索帮助",
         ["help.search.body"] =
             "#基本搜索\n" +
@@ -202,19 +191,40 @@ public static partial class Localization
             "也可以右键点击结果 → “仅在此文件夹中搜索”。\n" +
             "只输入路径不会搜索，请与关键词或扩展名一起使用。",
 
-        // 정보
         ["about.title"]   = "关于",
         ["about.version"] = "版本 {0}",
         ["about.desc"]    = "直接读取 NTFS 文件系统实现快速搜索的工具。",
 
-        // 인덱스 새로 고침
         ["refresh.confirm.msg"]   = "将从头重建索引。\n\n搜索可能会短暂暂停。要继续吗？",
         ["refresh.confirm.title"] = "刷新索引",
         ["refresh.fail"]          = "索引刷新失败",
 
-        // 공통
         ["common.error"]  = "错误",
         ["common.ok"]     = "确定",
         ["common.cancel"] = "取消",
+
+        ["rd.report.title"]     = "未能删除的项目",
+        ["rd.perm.title"]       = "永久删除",
+        ["rd.perm.msg"]         = "有 {0} 个项目无法移到回收站。\n\n要永久删除吗？\n此操作无法撤销。",
+        ["rd.blockedAt"]        = "受阻项目：",
+        ["rd.lock.unknown"]     = "未能确定占用的程序（可能是系统或杀毒软件）",
+        ["rd.cause.locked"]     = "正被其他程序使用",
+        ["rd.cause.denied"]     = "没有权限",
+        ["rd.cause.badname"]    = "名称或路径异常",
+        ["rd.cause.notempty"]   = "文件夹不为空",
+        ["rd.cause.notfound"]   = "已不存在",
+        ["rd.cause.protected"]  = "受系统保护的路径",
+        ["rd.cause.other"]      = "其他错误",
+        ["rd.hint.locked"]      = "请关闭上面列出的程序后重试。",
+        ["rd.hint.denied"]      = "所有权可能属于其他账户（例如 TrustedInstaller）。",
+        ["rd.hint.badname"]     = "资源管理器无法处理该名称。允许永久删除即可清除。",
+        ["rd.hint.notempty"]    = "其中部分项目未被删除。请一并查看上面的其他原因。",
+        ["rd.hint.protected"]   = "出于安全考虑未升级为永久删除。确有需要请在资源管理器中删除。",
+        ["rd.hint.notfound"]    = "该项目已不存在。",
+        ["rd.hint.other"]       = "未能确定原因。",
+        ["dn.permOne"]          = "永久删除",
+        ["dn.permMulti"]        = "已永久删除 {0} 个项目。",
+        ["dn.mixed"]            = "已删除 {0} 个（其中永久删除 {1} 个）",
+        ["dn.permSuffix"]       = "永久删除 {0} 个",
     };
 }

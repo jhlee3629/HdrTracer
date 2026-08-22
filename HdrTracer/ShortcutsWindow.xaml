@@ -46,7 +46,6 @@
                     WindowChrome.IsHitTestVisibleInChrome="True"/>
         </Grid>
 
-        <!-- 본문 -->
         <StackPanel Grid.Row="1"
                     Margin="20,16,20,16">
             <StackPanel>

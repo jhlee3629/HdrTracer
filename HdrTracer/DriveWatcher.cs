@@ -4,18 +4,10 @@ using Microsoft.Win32.SafeHandles;
 
 namespace HdrTracer.App;
 
-/// <summary>
-/// Windows의 WM_DEVICECHANGE 메시지를 후킹해서 드라이브 마운트/언마운트를 감지하고,
-/// 추가로 USN 모니터가 연 볼륨 핸들을 RegisterDeviceNotification(DBT_DEVTYP_HANDLE)로
-/// 등록한다. 이렇게 해야 사용자가 "안전 제거"를 시도할 때 Windows가 우리에게
-/// DBT_DEVICEQUERYREMOVE를 보내주고, 그때 핸들을 닫아 안전 제거가 성공한다.
-/// (단순 볼륨 후킹만으로는 query-remove가 도착하지 않는다 — 이것이 핵심.)
-/// </summary>
 public sealed class DriveWatcher : IDisposable
 {
-    public event Action<string>? DriveArrived;   // 인자: "F:"
-    public event Action<string>? DriveRemoved;   // 인자: "F:"
-    // 안전 제거 시도 직전. 해당 드라이브 핸들을 풀어줄 마지막 기회.
+    public event Action<string>? DriveArrived;   
+    public event Action<string>? DriveRemoved;   
     public event Action<string>? DriveQueryRemove;
 
     private const int WM_DEVICECHANGE = 0x0219;
@@ -44,7 +36,6 @@ public sealed class DriveWatcher : IDisposable
         public ushort dbcv_flags;
     }
 
-    // DBT_DEVTYP_HANDLE 알림 등록/수신용 구조체
     [StructLayout(LayoutKind.Sequential)]
     private struct DEV_BROADCAST_HANDLE
     {
@@ -69,10 +60,8 @@ public sealed class DriveWatcher : IDisposable
     private HwndSource? _source;
     private IntPtr _hwnd = IntPtr.Zero;
 
-    // 드라이브 문자 → 등록 핸들(hdevnotify)
     private readonly Dictionary<string, IntPtr> _notify =
         new(StringComparer.OrdinalIgnoreCase);
-    // 등록 핸들(hdevnotify) → 드라이브 문자 (query-remove 수신 시 역추적)
     private readonly Dictionary<IntPtr, string> _notifyToDrive = new();
     private readonly object _lock = new();
 
@@ -83,10 +72,6 @@ public sealed class DriveWatcher : IDisposable
         _source.AddHook(WndProc);
     }
 
-    /// <summary>
-    /// USN 모니터가 연 볼륨 핸들을 등록한다. 이후 그 드라이브의 안전 제거 시도 시
-    /// Windows가 query-remove를 우리 창으로 보낸다.
-    /// </summary>
     public void RegisterVolumeHandle(string driveLetter, SafeFileHandle volumeHandle)
     {
         if (_hwnd == IntPtr.Zero || volumeHandle is null || volumeHandle.IsInvalid) return;
@@ -123,7 +108,6 @@ public sealed class DriveWatcher : IDisposable
         }
     }
 
-    /// <summary>드라이브 알림 등록 해제 (핸들을 닫기 전에 호출).</summary>
     public void UnregisterVolume(string driveLetter)
     {
         lock (_lock)
@@ -146,7 +130,6 @@ public sealed class DriveWatcher : IDisposable
 
         var hdr = Marshal.PtrToStructure<DEV_BROADCAST_HDR>(lParam);
 
-        // 1) 핸들 타입 알림 (우리가 등록한 볼륨 핸들에 대한 query-remove)
         if (hdr.dbch_devicetype == DBT_DEVTYP_HANDLE)
         {
             if (evt == DBT_DEVICEQUERYREMOVE)
@@ -158,12 +141,11 @@ public sealed class DriveWatcher : IDisposable
                     _notifyToDrive.TryGetValue(hh.dbch_hdevnotify, out drive);
                 }
                 if (drive is not null)
-                    DriveQueryRemove?.Invoke(drive);  // 핸들을 닫아줄 기회
+                    DriveQueryRemove?.Invoke(drive); 
             }
             return IntPtr.Zero;
         }
 
-        // 2) 볼륨 타입 알림 (도착/제거완료)
         if (hdr.dbch_devicetype == DBT_DEVTYP_VOLUME)
         {
             if (evt != DBT_DEVICEARRIVAL && evt != DBT_DEVICEREMOVECOMPLETE)

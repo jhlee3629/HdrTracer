@@ -1,11 +1,9 @@
 namespace HdrTracer.Core;
 
-// 일본어 문자열. 번역이 빠진 키는 자동으로 영어로 대체된다.
 public static partial class Localization
 {
     internal static readonly Dictionary<string, string> _ja = new()
     {
-        // 메뉴
         ["menu.settings"]     = "設定",
         ["menu.refresh"]      = "インデックスの再作成",
         ["menu.resetCols"]    = "列幅をリセット",
@@ -29,7 +27,6 @@ public static partial class Localization
         ["export.done"]       = "{0} 件を CSV に保存しました。",
         ["menu.filter"]       = "フィルター",
 
-        // 툴팁
         ["tip.menu"]     = "メニュー",
         ["tip.minimize"] = "最小化",
         ["tip.maximize"] = "最大化",
@@ -38,12 +35,10 @@ public static partial class Localization
         ["tip.delete"]   = "削除",
         ["tip.pin"]      = "ピン留め / 解除",
 
-        // 검색창·빈 결과
         ["search.placeholder"] = "ファイル名を入力して Enter",
         ["empty.title"] = "結果がありません",
         ["empty.body"]  = "検索語を短くするか、別の語で試してください\n複数の語はすべて含む項目だけが一致します\nヘルプ: メニュー (HdrTracer ▼) → 検索ヘルプ",
 
-        // 우클릭 메뉴
         ["ctx.open"]           = "開く",
         ["ctx.runAsAdmin"]     = "管理者として実行",
         ["ctx.openWith"]       = "プログラムから開く...",
@@ -74,7 +69,6 @@ public static partial class Localization
         ["ctx.error"]          = "エラー",
         ["ctx.notExecutable"]  = "実行ファイルではありません",
 
-        // 빠른 필터
         ["filter.doc"]         = "文書",
         ["filter.img"]         = "画像",
         ["filter.media"]       = "メディア",
@@ -94,7 +88,6 @@ public static partial class Localization
         ["filter.kind.folder"] = "フォルダーのみ",
         ["filter.kind.file"]   = "ファイルのみ",
 
-        // 컬럼·상태
         ["col.drive"]  = "DRV",
         ["col.name"]   = "名前",
         ["col.path"]   = "パス",
@@ -111,14 +104,12 @@ public static partial class Localization
         ["status.driveDone"]        = "{0} 完了({1:N0})",
         ["status.driveWorking"]     = "{0} 処理中",
 
-        // 트레이
         ["tray.open"]         = "HdrTracer を開く",
         ["tray.exit"]         = "終了",
         ["tray.pinned"]       = "ピン留めした検索",
         ["tray.pinned.empty"] = "ピン留めした検索はありません",
         ["tray.settings"]     = "設定",
 
-        // 설정
         ["settings.title"]     = "設定",
         ["settings.indexing"]  = "インデックス",
         ["settings.usb"]       = "リムーバブルドライブをインデックス",
@@ -141,7 +132,6 @@ public static partial class Localization
         ["settings.restoreSearch.desc"] = "アプリを開き直すと、前回の検索語で検索した状態で始まります。",
         ["hotkey.fail"]            = "グローバル ホットキー (Win+Alt+S) の登録に失敗しました — 他のプログラムが使用している可能性があります。",
 
-        // 단축키 창
         ["sc.title"]        = "ショートカット",
         ["sc.appMenu"]      = "アプリ メニュー",
         ["sc.openSettings"] = "設定を開く",
@@ -170,7 +160,6 @@ public static partial class Localization
         ["sc.tip1"]         = "複数の語をスペースで区切ると、すべてを含む結果を検索します（AND 検索）。",
         ["sc.tip2"]         = "韓国語は 2 文字以上、英字は 3 文字以上で N-gram 高速検索が使えます。",
 
-        // 검색 도움말
         ["help.search.title"] = "検索ヘルプ",
         ["help.search.body"] =
             "#基本の検索\n" +
@@ -202,19 +191,40 @@ public static partial class Localization
             "結果を右クリック →「このフォルダー内だけを検索」でも指定できます。\n" +
             "パスだけでは検索されません。語句や拡張子と一緒に使ってください。",
 
-        // 정보
         ["about.title"]   = "バージョン情報",
         ["about.version"] = "バージョン {0}",
         ["about.desc"]    = "NTFS ファイル システムを直接読み取って高速に検索するツールです。",
 
-        // 인덱스 새로 고침
         ["refresh.confirm.msg"]   = "インデックスを最初から作り直します。\n\n検索が一時的に止まる場合があります。続行しますか？",
         ["refresh.confirm.title"] = "インデックスの再作成",
         ["refresh.fail"]          = "インデックスの再作成に失敗しました",
 
-        // 공통
         ["common.error"]  = "エラー",
         ["common.ok"]     = "OK",
         ["common.cancel"] = "キャンセル",
+
+        ["rd.report.title"]     = "削除できなかった項目",
+        ["rd.perm.title"]       = "完全に削除",
+        ["rd.perm.msg"]         = "ごみ箱に移動できない項目が {0} 件あります。\n\n完全に削除しますか？\nこの操作は元に戻せません。",
+        ["rd.blockedAt"]        = "妨げている項目:",
+        ["rd.lock.unknown"]     = "使用中のプログラムを特定できませんでした (システムやウイルス対策ソフトの可能性があります)",
+        ["rd.cause.locked"]     = "他のプログラムが使用中",
+        ["rd.cause.denied"]     = "アクセス権がありません",
+        ["rd.cause.badname"]    = "名前・パスが不正",
+        ["rd.cause.notempty"]   = "フォルダーが空ではありません",
+        ["rd.cause.notfound"]   = "すでに存在しません",
+        ["rd.cause.protected"]  = "システム保護されたパス",
+        ["rd.cause.other"]      = "その他のエラー",
+        ["rd.hint.locked"]      = "上に表示されたプログラムを閉じてから、もう一度お試しください。",
+        ["rd.hint.denied"]      = "所有権が別のアカウント (例: TrustedInstaller) にある可能性があります。",
+        ["rd.hint.badname"]     = "エクスプローラーでは扱えない名前です。完全削除を許可すると削除できます。",
+        ["rd.hint.notempty"]    = "中の一部の項目が削除できませんでした。上の他の原因も確認してください。",
+        ["rd.hint.protected"]   = "安全のため完全削除には進みませんでした。本当に必要ならエクスプローラーで削除してください。",
+        ["rd.hint.notfound"]    = "すでに存在しない項目です。",
+        ["rd.hint.other"]       = "原因を特定できませんでした。",
+        ["dn.permOne"]          = "完全に削除",
+        ["dn.permMulti"]        = "{0} 件を完全に削除しました。",
+        ["dn.mixed"]            = "{0} 件を削除 (うち完全削除 {1} 件)",
+        ["dn.permSuffix"]       = "完全削除 {0} 件",
     };
 }

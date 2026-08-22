@@ -1,6 +1,5 @@
 namespace HdrTracer.Core;
 
-// 스페인어 문자열. 번역이 빠진 키는 자동으로 영어로 대체된다.
 public static partial class Localization
 {
     internal static readonly Dictionary<string, string> _es = new()
@@ -203,5 +202,29 @@ public static partial class Localization
         ["common.error"]  = "Error",
         ["common.ok"]     = "Aceptar",
         ["common.cancel"] = "Cancelar",
+
+        ["rd.report.title"]     = "Elementos que no se pudieron eliminar",
+        ["rd.perm.title"]       = "Eliminación permanente",
+        ["rd.perm.msg"]         = "Hay {0} elemento(s) que no se pueden mover a la papelera.\n\n¿Eliminarlos permanentemente?\nEsta acción no se puede deshacer.",
+        ["rd.blockedAt"]        = "Bloqueado en:",
+        ["rd.lock.unknown"]     = "No se pudo identificar el programa (puede ser el sistema o el antivirus)",
+        ["rd.cause.locked"]     = "En uso por otro programa",
+        ["rd.cause.denied"]     = "Acceso denegado",
+        ["rd.cause.badname"]    = "Nombre o ruta no válidos",
+        ["rd.cause.notempty"]   = "La carpeta no está vacía",
+        ["rd.cause.notfound"]   = "Ya no existe",
+        ["rd.cause.protected"]  = "Ruta protegida del sistema",
+        ["rd.cause.other"]      = "Otro error",
+        ["rd.hint.locked"]      = "Cierra los programas indicados arriba y vuelve a intentarlo.",
+        ["rd.hint.denied"]      = "La propiedad puede pertenecer a otra cuenta (p. ej., TrustedInstaller).",
+        ["rd.hint.badname"]     = "El Explorador no puede manejar este nombre. Permite la eliminación permanente para borrarlo.",
+        ["rd.hint.notempty"]    = "Algunos elementos del interior no se eliminaron. Consulta las otras causas de arriba.",
+        ["rd.hint.protected"]   = "No se elevó a eliminación permanente por seguridad. Bórralo desde el Explorador si es necesario.",
+        ["rd.hint.notfound"]    = "El elemento ya no existe.",
+        ["rd.hint.other"]       = "No se pudo determinar la causa.",
+        ["dn.permOne"]          = "Eliminado permanentemente",
+        ["dn.permMulti"]        = "Se eliminaron permanentemente {0} elemento(s).",
+        ["dn.mixed"]            = "{0} eliminado(s) ({1} de forma permanente)",
+        ["dn.permSuffix"]       = "{0} permanentemente",
     };
 }

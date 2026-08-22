@@ -14,15 +14,13 @@ public sealed class FileIndex
         public ushort Flags;
         public int    ParentIndex;
         public long   Size;
-        public long   ModifiedTicks;   // DateTime.Ticks (UTC) — 0이면 미설정
+        public long   ModifiedTicks; 
         public ulong  MftRef;
     }
 
     private const ushort FlagDirectory = 1;
     private const ushort FlagDeleted   = 2;
-    // 항목 자체가 숨김+시스템 속성인지
     private const ushort FlagHiddenSystem = 4;
-    // 조상 폴더(또는 자기 자신)가 숨김+시스템이라 "감춰진" 항목인지 (LinkParents 후 전파됨)
     private const ushort FlagHiddenSystemEffective = 8;
 
     private const int InitialCapacity  = 1 << 18;
@@ -46,7 +44,6 @@ public sealed class FileIndex
 
     public string DriveLetter { get; set; } = "";
 
-    // === N-gram 인덱스 ===
     private NgramIndex? _ngram;
     private int _ngramBuiltAtCount;
 
@@ -85,8 +82,6 @@ public sealed class FileIndex
         };
         _parentRefs[_count] = parentRef & MftRefMask;
 
-        // 같은 mftRef가 여러 번 추가될 수 있음 (NTFS 하드링크).
-        // 첫 인스턴스만 매핑에 기록하여 자식들이 부모 찾을 때 안정적인 위치를 얻도록 함.
         _mftToIndex.TryAdd(selfMasked, _count);
         _poolPos += nameLen;
         if (isDir) DirCount++; else FileCount++;
@@ -113,38 +108,27 @@ public sealed class FileIndex
         return rootCount;
     }
 
-    /// <summary>
-    /// 숨김+시스템 폴더의 모든 하위 항목에 "감춰짐"(FlagHiddenSystemEffective) 비트를 전파한다.
-    /// 인덱싱 직후 한 번만 수행하면, 검색 시에는 이 비트 하나만 검사하면 되므로 매우 빠르다.
-    /// 각 항목의 조상을 따라 올라가되, 계산 결과를 캐싱(메모이제이션)하여 전체 O(N)에 처리.
-    /// </summary>
     public void PropagateHiddenSystem()
     {
-        // memo: 0 = 미계산, 1 = 감춰짐, 2 = 안 감춰짐
         var memo = new byte[_count];
 
-        // 경로 누적용 버퍼 (재사용)
         var path = new int[256];
 
         for (int i = 0; i < _count; i++)
         {
             if (memo[i] != 0) continue;
 
-            // i에서 부모를 따라 올라가며 미계산 노드를 path에 쌓는다.
             int len = 0;
             int cur = i;
-            byte resolved = 0;   // 조상에서 확정된 결과
+            byte resolved = 0; 
 
             while (cur >= 0)
             {
-                if (memo[cur] != 0) { resolved = memo[cur]; break; }      // 캐시 적중
+                if (memo[cur] != 0) { resolved = memo[cur]; break; }    
 
-                // 드라이브 루트(부모 없음)는 NTFS 구조상 숨김+시스템 속성을 갖지만,
-                // 이는 "루트 안을 숨기자"는 의미가 아니므로 숨김 조상으로 치지 않는다.
-                // (루트를 self로 인정하면 드라이브 전체가 감춰져 버림)
                 bool isRoot = _entries[cur].ParentIndex < 0;
 
-                if (!isRoot && (_entries[cur].Flags & FlagHiddenSystem) != 0)  // 자기 자신이 숨김+시스템
+                if (!isRoot && (_entries[cur].Flags & FlagHiddenSystem) != 0)  
                 {
                     memo[cur] = 1;
                     resolved = 1;
@@ -152,15 +136,11 @@ public sealed class FileIndex
                 }
                 if (len < path.Length) path[len] = cur;
                 len++;
-                cur = _entries[cur].ParentIndex;   // 부모로
+                cur = _entries[cur].ParentIndex;   
             }
 
-            // 루트까지 갔는데 아무 데서도 숨김+시스템을 못 만났으면 "안 감춰짐"
             if (resolved == 0) resolved = 2;
 
-            // path에 쌓인(자기 + 비숨김 조상들) 노드들에 결과 적용.
-            // 단, path 버퍼를 넘어선 깊은 경로의 노드는 memo가 아직 0일 수 있는데,
-            // 그 경우 resolved 값으로 안전하게 채워진다(다음 패스에서 재방문되지 않도록).
             int fill = Math.Min(len, path.Length);
             for (int k = 0; k < fill; k++)
                 memo[path[k]] = resolved;
@@ -195,7 +175,6 @@ public sealed class FileIndex
         ushort flags = (ushort)(isDir ? FlagDirectory : 0);
         if (isHiddenSystem) flags |= FlagHiddenSystem;
 
-        // "감춰짐" 비트: 자기 자신이 숨김+시스템이거나, 부모가 이미 감춰진 상태면 물려받음
         bool effective = isHiddenSystem
             || (parentIdx >= 0 && (_entries[parentIdx].Flags & FlagHiddenSystemEffective) != 0);
         if (effective) flags |= FlagHiddenSystemEffective;
@@ -259,7 +238,6 @@ public sealed class FileIndex
     public bool IsDirectory(int index) => (_entries[index].Flags & FlagDirectory) != 0;
     public bool IsDeleted(int index)   => (_entries[index].Flags & FlagDeleted) != 0;
 
-    /// <summary>이 항목이 숨김+시스템 폴더(또는 그 하위)에 속해 "감춰진" 항목인지.</summary>
     public bool IsHiddenSystemEffective(int index)
     {
         if ((uint)index >= (uint)_count) return false;
@@ -350,22 +328,18 @@ public sealed class FileIndex
         });
     }
 
-    // 직렬화/역직렬화
     public void WriteTo(BinaryWriter bw)
     {
         bw.Write(_count);
         bw.Write(_poolPos);
 
-        // Entry 배열을 raw bytes로 (Entry는 unmanaged struct이므로 안전)
         int entryBytes = _count * Unsafe.SizeOf<Entry>();
         var span = MemoryMarshal.AsBytes(_entries.AsSpan(0, _count));
         bw.Write(span);
 
-        // 문자열 풀
         var charBytes = MemoryMarshal.AsBytes(_pool.AsSpan(0, _poolPos));
         bw.Write(charBytes);
 
-        // 통계 정보
         bw.Write(FileCount);
         bw.Write(DirCount);
     }
@@ -377,7 +351,6 @@ public sealed class FileIndex
 
         var index = new FileIndex();
 
-        // Entry 배열
         if (count > index._entries.Length)
             index._entries = new Entry[count];
         int entryBytes = count * Unsafe.SizeOf<Entry>();
@@ -385,7 +358,6 @@ public sealed class FileIndex
         int read = br.Read(entrySpan);
         if (read != entryBytes) throw new InvalidDataException("Entry data truncated");
 
-        // 문자열 풀
         if (poolPos > index._pool.Length)
             index._pool = new char[poolPos];
         var poolSpan = MemoryMarshal.AsBytes(index._pool.AsSpan(0, poolPos));
@@ -400,8 +372,6 @@ public sealed class FileIndex
         index.FileCount = fileCount;
         index.DirCount = dirCount;
 
-        // _mftToIndex 사전 재구축 (직렬화 안 했음).
-        // 같은 mftRef가 여러 번 있을 수 있으므로 첫 인스턴스만 기록.
         index._mftToIndex.EnsureCapacity(count);
         for (int i = 0; i < count; i++)
         {
@@ -409,7 +379,6 @@ public sealed class FileIndex
             index._mftToIndex.TryAdd(index._entries[i].MftRef, i);
         }
 
-        // _parentRefs는 이미 LinkParents가 끝난 상태로 저장됐으니 비워둠
         index._parentRefs = Array.Empty<ulong>();
 
         return index;

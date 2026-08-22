@@ -3,7 +3,6 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <Application.Resources>
 
-        <!-- 공통: 타이틀바 버튼 (최소화/최대화) -->
         <Style x:Key="TitleBarButtonStyle" TargetType="Button">
             <Setter Property="Width" Value="35"/>
             <Setter Property="Height" Value="30"/>
@@ -37,7 +36,6 @@
             </Setter>
         </Style>
 
-        <!-- 닫기 버튼: 호버 시 빨간색 -->
         <Style x:Key="CloseButtonStyle" TargetType="Button" BasedOn="{StaticResource TitleBarButtonStyle}">
             <Setter Property="Template">
                 <Setter.Value>
@@ -62,7 +60,6 @@
             </Setter>
         </Style>
 
-        <!-- 다크 테마 ContextMenu 스타일 (전역 적용) -->
         <Style TargetType="ContextMenu">
             <Setter Property="Background" Value="#2D2D30"/>
             <Setter Property="Foreground" Value="White"/>
@@ -85,7 +82,6 @@
             </Setter>
         </Style>
 
-        <!-- MenuItem 컨트롤 템플릿 재정의 -->
         <Style TargetType="MenuItem">
             <Setter Property="Background" Value="Transparent"/>
             <Setter Property="Foreground" Value="White"/>
@@ -93,7 +89,6 @@
             <Setter Property="Height" Value="26"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Style.Triggers>
-                <!-- 자식이 없는 일반 항목 -->
                 <Trigger Property="Role" Value="SubmenuItem">
                     <Setter Property="Template">
                         <Setter.Value>
@@ -132,7 +127,6 @@
                     </Setter>
                 </Trigger>
 
-                <!-- 자식이 있는 항목 (서브메뉴 헤더) -->
                 <Trigger Property="Role" Value="SubmenuHeader">
                     <Setter Property="Template">
                         <Setter.Value>
@@ -151,14 +145,14 @@
                                                         RecognizesAccessKey="True"
                                                         VerticalAlignment="Center"
                                                         TextElement.Foreground="{TemplateBinding Foreground}"/>
-                                        <!-- ▶ 화살표 -->
+                                        
                                         <TextBlock Grid.Column="1"
                                                 Text="▶"
                                                 Foreground="#CCCCCC"
                                                 FontSize="9"
                                                 Margin="24,0,0,0"
                                                 VerticalAlignment="Center"/>
-                                        <!-- 자식 메뉴 팝업 -->
+                                        
                                         <Popup x:Name="PART_Popup"
                                             Placement="Right"
                                             IsOpen="{TemplateBinding IsSubmenuOpen}"
@@ -190,7 +184,6 @@
             </Style.Triggers>
         </Style>
 
-        <!-- Separator (메뉴 구분선) 다크 테마 -->
         <Style TargetType="Separator" x:Key="{x:Static MenuItem.SeparatorStyleKey}">
             <Setter Property="Template">
                 <Setter.Value>
@@ -203,7 +196,6 @@
             </Setter>
         </Style>
 
-        <!-- CheckBox를 토글 스위치 스타일로 (다크 테마) -->
         <Style x:Key="DarkToggleStyle" TargetType="CheckBox">
             <Setter Property="Cursor" Value="Hand"/>
             <Setter Property="Width" Value="44"/>
@@ -237,7 +229,7 @@
                 </Setter.Value>
             </Setter>
         </Style>
-        <!-- 키보드 포커스 표시 (MainWindow에서 FocusVisualStyle로 참조) -->
+        
         <Style x:Key="AppFocusVisual">
             <Setter Property="Control.Template">
                 <Setter.Value>

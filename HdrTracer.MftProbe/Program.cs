@@ -12,7 +12,6 @@ internal static class Program
         try
         {
             var sw = Stopwatch.StartNew();
-            // raw MFT 직접 읽기 (메인 앱과 동일한 인덱서). LinkParents는 내부에서 수행됨.
             var (idx, _, _) = RawMftReader.BuildIndexWithJournalInfo(drive);
             index = idx;
             sw.Stop();

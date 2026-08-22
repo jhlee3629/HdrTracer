@@ -29,7 +29,7 @@ A fast file search tool for Windows that finds files on NTFS drives by name.
 - Excluded folders — hide system-ish folders like WinSxS or node_modules from results
 - Remembers your window size & position, column widths, and sort order
 - Lives in the tray + optional "Start with Windows" (via Task Scheduler — no UAC prompt at sign-in, off by default)
-- Global hotkey \Win + Alt + S` — summon the window from any app, press again to hide to tray (can be disabled in Settings)→- Global hotkey `Win + Alt + S` — summon the window from any app (press Esc to hide it; can be disabled in Settings)`
+- Global hotkey `Win + Alt + S` — summon the window from any app (press Esc to hide it; can be disabled in Settings)`
 - Dark theme, Korean / English support (first run …) → - Dark theme, 7 languages: Korean, English, Chinese (Simplified), Japanese, Spanish, German, French (first run follows your Windows display language)
 
 ## Requirements
@@ -73,7 +73,7 @@ The .NET runtime is bundled, so there is nothing else to install.
 | `photo >2026-01` · `>week` | modified-date condition (year-month-day · today / week / month / year) |
 | `IMGedit.txt` | whole-name match incl. extension (use `IMG_edit` for any extension) |`
 
-Full details: app menu (HdrTracer ▼) → **Search help**.
+Full details: app menu (HdrTracer ▼) → Search help.
 
 ### Pinned searches
 
@@ -108,7 +108,7 @@ settings to include them.
 - NTFS only. Other file systems are not indexed.
 - No file content search. Only names and paths are searched.
 - SmartScreen warning appears because the build is not code-signed.
-- Deletion moves items to the **Recycle Bin** (recoverable), not a permanent delete. If system-critical paths are included, an extra warning is shown before deleting.
+- Deletion moves items to the Recycle Bin (recoverable), not a permanent delete. If system-critical paths are included, an extra warning is shown before deleting.
 
 ## License
 

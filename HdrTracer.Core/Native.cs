@@ -130,8 +130,6 @@ internal static class Native
         public ulong AllocationDelta;
     }
 
-    // === Raw MFT 읽기용 ===
-
     [DllImport("kernel32.dll", SetLastError = true)]
     public static extern bool SetFilePointerEx(
         SafeFileHandle hFile,

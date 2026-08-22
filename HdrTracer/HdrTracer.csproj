@@ -9,23 +9,19 @@
     <ApplicationIcon>Assets\sun.ico</ApplicationIcon>
     <Platforms>x64</Platforms>
 
-    <!-- 관리자 권한 자동 요청을 위한 manifest -->
     <ApplicationManifest>app.manifest</ApplicationManifest>
 
-    <!-- WindowsForms용 HiDPI 설정 (PerMonitorV2: 4K 모니터에서 선명) -->
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
 
-    <!-- 앱 메타데이터 (Windows 파일 속성 창에 표시됨) -->
     <Product>HdrTracer</Product>
     <AssemblyTitle>HdrTracer</AssemblyTitle>
     <Description>NTFS 파일 검색 도구</Description>
     <Company>HaeDream</Company>
     <Copyright>Copyright © 2026</Copyright>
-    <Version>1.2.2</Version>
-    <AssemblyVersion>1.2.2.0</AssemblyVersion>
-    <FileVersion>1.2.2.0</FileVersion>
+    <Version>1.3.0</Version>
+    <AssemblyVersion>1.3.0.0</AssemblyVersion>
+    <FileVersion>1.3.0.0</FileVersion>
 
-    <!-- 단일 exe 배포 빌드 옵션 (dotnet publish 명령에서만 의미 있음) -->
     <PublishSingleFile>true</PublishSingleFile>
     <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>

@@ -1,12 +1,9 @@
 namespace HdrTracer.Core;
 
-// 언어별 문자열 사전 (Localization의 부분 클래스).
-// 새 언어를 추가하려면: 이 형식으로 파일 하나를 만들고 Localization.cs의 Table()에 한 줄 추가.
 public static partial class Localization
 {
     internal static readonly Dictionary<string, string> _en = new()
     {
-        // Menu
         ["menu.settings"]     = "Settings",
         ["menu.refresh"]      = "Refresh Index",
         ["menu.resetCols"]    = "Reset column widths",
@@ -24,15 +21,12 @@ public static partial class Localization
         ["menu.lang.es"]      = "Spanish",
         ["menu.lang.de"]      = "German",
         ["menu.lang.fr"]      = "French",
-        ["menu.searchHelp"]   = "Search Help",
         ["menu.export"]       = "Export results (CSV)",
         ["ctx.export"]        = "Export selected items",
         ["export.done"]       = "Saved {0} items to CSV.",
 
-        // Filter menu
         ["menu.filter"]  = "Filter",
 
-        // Title bar button tooltips
         ["tip.menu"]     = "Menu",
         ["tip.minimize"] = "Minimize",
         ["tip.maximize"] = "Maximize",
@@ -45,7 +39,6 @@ public static partial class Localization
         ["empty.title"] = "No results",
         ["empty.body"]  = "Try a shorter or different search term\nMultiple words match only items containing all of them\nHelp: menu (HdrTracer ▼) → Search help",
 
-        // Search result context menu
         ["ctx.open"]       = "Open",
         ["ctx.runAsAdmin"] = "Run as administrator",
         ["ctx.openWith"]   = "Open with...",
@@ -76,7 +69,6 @@ public static partial class Localization
         ["ctx.error"]          = "Error",
         ["ctx.notExecutable"]  = "Not an executable file",
 
-        // Quick filter buttons
         ["filter.doc"]   = "Docs",
         ["filter.img"]   = "Images",
         ["filter.media"] = "Media",
@@ -96,14 +88,12 @@ public static partial class Localization
         ["filter.kind.folder"] = "Folders only",
         ["filter.kind.file"]   = "Files only",
 
-        // Column headers
         ["col.drive"] = "DRV",
         ["col.name"]  = "Name",
         ["col.path"]  = "Path",
         ["col.size"]  = "Size",
         ["col.date"]  = "Date Modified",
 
-        // Status bar / banner
         ["status.indexing"] = "Indexing drives...",
         ["status.total"]    = "Total",
         ["status.items"]    = " items",
@@ -115,14 +105,12 @@ public static partial class Localization
         ["status.driveDone"]        = "{0} done ({1:N0})",
         ["status.driveWorking"]     = "{0} working",
 
-        // Tray
         ["tray.open"] = "Open HdrTracer",
         ["tray.exit"] = "Exit",
         ["tray.pinned"]       = "Pinned searches",
         ["tray.pinned.empty"] = "No pinned searches",
         ["tray.settings"]     = "Settings",
 
-        // Settings window
         ["settings.title"]      = "Settings",
         ["settings.indexing"]   = "Indexing",
         ["settings.usb"]        = "Index removable drives",
@@ -145,7 +133,6 @@ public static partial class Localization
         ["settings.restoreSearch.desc"] = "Reopens with your last search already run.",
         ["hotkey.fail"]          = "Failed to register the global hotkey (Win+Alt+S) — another program may be using it.",
 
-        // Shortcuts window
         ["sc.title"]        = "Shortcuts",
         ["sc.appMenu"]      = "App Menu",
         ["sc.openSettings"] = "Open Settings",
@@ -208,19 +195,40 @@ public static partial class Localization
             "You can also right-click a result → 'Search in this folder'.\n" +
             "A path alone finds nothing — combine it with a word or extension.",
 
-        // About window
         ["about.title"]   = "About",
         ["about.version"] = "Version {0}",
         ["about.desc"]    = "A tool that reads the NTFS file system directly for fast searching.",
 
-        // Refresh index dialog
         ["refresh.confirm.msg"]   = "The index will be rebuilt from scratch.\n\nSearch may pause briefly. Continue?",
         ["refresh.confirm.title"] = "Refresh Index",
         ["refresh.fail"]          = "Index refresh failed",
 
-        // Common
         ["common.error"] = "Error",
         ["common.ok"]     = "OK",
         ["common.cancel"] = "Cancel",
+
+        ["rd.report.title"]     = "Items that could not be deleted",
+        ["rd.perm.title"]       = "Permanent delete",
+        ["rd.perm.msg"]         = "{0} item(s) cannot be sent to the Recycle Bin.\n\nDelete them permanently?\nThis cannot be undone.",
+        ["rd.blockedAt"]        = "Blocked at:",
+        ["rd.lock.unknown"]     = "Could not identify the program (may be the system or antivirus)",
+        ["rd.cause.locked"]     = "In use by another program",
+        ["rd.cause.denied"]     = "Access denied",
+        ["rd.cause.badname"]    = "Invalid name or path",
+        ["rd.cause.notempty"]   = "Folder is not empty",
+        ["rd.cause.notfound"]   = "Already gone",
+        ["rd.cause.protected"]  = "Protected system path",
+        ["rd.cause.other"]      = "Other error",
+        ["rd.hint.locked"]      = "Close the programs listed above, then try again.",
+        ["rd.hint.denied"]      = "Ownership may belong to another account (e.g. TrustedInstaller).",
+        ["rd.hint.badname"]     = "Explorer cannot handle this name. Allow permanent delete to remove it.",
+        ["rd.hint.notempty"]    = "Some items inside were not removed. See the other causes above.",
+        ["rd.hint.protected"]   = "Not escalated to permanent delete for safety. Remove it from Explorer if truly needed.",
+        ["rd.hint.notfound"]    = "The item is already gone.",
+        ["rd.hint.other"]       = "The cause could not be determined.",
+        ["dn.permOne"]          = "Permanently deleted",
+        ["dn.permMulti"]        = "Permanently deleted {0} item(s).",
+        ["dn.mixed"]            = "Deleted {0} item(s) ({1} permanently)",
+        ["dn.permSuffix"]       = "{0} permanently",
     };
 }

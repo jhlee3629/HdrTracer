@@ -2,11 +2,6 @@
 <assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v1">
   <assemblyIdentity version="1.0.0.0" name="HdrTracer.app"/>
 
-  <!--
-    관리자 권한 자동 요청.
-    raw NTFS MFT와 USN Journal에 접근하려면 관리자 권한이 필수이므로
-    실행 시 자동으로 UAC 대화상자가 뜬다.
-  -->
   <trustInfo xmlns="urn:schemas-microsoft-com:asm.v2">
     <security>
       <requestedPrivileges xmlns="urn:schemas-microsoft-com:asm.v3">
@@ -15,7 +10,6 @@
     </security>
   </trustInfo>
 
-  <!-- Windows 10/11 호환성 선언 -->
   <compatibility xmlns="urn:schemas-microsoft-com:compatibility.v1">
     <application>
       <!-- Windows 10 -->
@@ -29,7 +23,6 @@
     </application>
   </compatibility>
 
-  <!-- 긴 경로(260자 초과) 지원 -->
   <application xmlns="urn:schemas-microsoft-com:asm.v3">
     <windowsSettings>
       <longPathAware xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">true</longPathAware>

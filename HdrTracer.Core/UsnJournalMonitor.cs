@@ -8,7 +8,6 @@ public sealed class UsnJournalMonitor : IDisposable
     private readonly FileIndex _index;
     private readonly string _driveLetter;
     private readonly SafeFileHandle _handle;
-    /// <summary>USN 저널을 읽는 볼륨 핸들. 안전 제거(query-remove) 알림 등록에 사용된다.</summary>
     public SafeFileHandle VolumeHandle => _handle;
     private readonly ulong _journalId;
     private readonly CancellationTokenSource _cts = new();
@@ -22,7 +21,6 @@ public sealed class UsnJournalMonitor : IDisposable
     public long EntriesRemoved;
     public long EntriesRenamed;
 
-    /// <summary>인덱스가 갱신되었을 때 발생. GUI가 이 이벤트를 구독해서 검색을 재실행할 수 있다.</summary>
     public event Action? IndexChanged;
 
     private bool _supported = true;
@@ -55,7 +53,6 @@ public sealed class UsnJournalMonitor : IDisposable
 
         if (!ok)
         {
-            // USN Journal이 없는 드라이브 (예: 일부 USB) — 모니터링 비활성, 정적 인덱스로만 사용
             _journalId = 0;
             _nextUsn = 0;
             _supported = false;

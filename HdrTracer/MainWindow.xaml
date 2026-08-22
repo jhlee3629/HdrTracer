@@ -14,12 +14,6 @@
         PreviewMouseWheel="Window_PreviewMouseWheel">
 
     <Window.Resources>
-        <!-- 결과 목록 스크롤바: 앱 다크 팔레트에 맞춘 얇은 디자인.
-             기본 Windows 스크롤바(밝은 회색 + 화살표 버튼)가 창과 겉돌아 직접 그린다. -->
-        <!-- 결과 목록 스크롤바: 앱 다크 팔레트에 맞춘 얇은 디자인.
-             Track이 계산하는 손잡이 크기는 항목이 많으면 몇 px까지 작아지고
-             MinHeight로도 늘어나지 않아, Track을 쓰지 않고 손잡이를 직접 배치한다. -->
-        <!-- 스크롤바 화살표(위/아래): 폭 11px에 맞춘 작은 기호 -->
         <Style x:Key="DarkScrollArrow" TargetType="RepeatButton">
             <Setter Property="OverridesDefaultStyle" Value="True"/>
             <Setter Property="Focusable" Value="False"/>
@@ -91,13 +85,10 @@
                                 <RowDefinition Height="Auto"/>
                             </Grid.RowDefinitions>
 
-                            <!-- 위 화살표 -->
                             <RepeatButton x:Name="PART_LineUpCustom" Grid.Row="0"
                                           Style="{StaticResource DarkScrollArrow}"
                                           Content="&#x25B2;"/>
 
-                            <!-- 트랙 + 손잡이.
-                                 손잡이 높이·위치는 코드(ScrollBarThumbSizer)가 스크롤 상태에 맞춰 정한다. -->
                             <Canvas x:Name="PART_TrackCanvas" Grid.Row="1" ClipToBounds="True"
                                     Background="Transparent">
                                 <Thumb x:Name="PART_ThumbCustom"
@@ -105,7 +96,6 @@
                                        Width="{Binding ActualWidth, ElementName=Root}"/>
                             </Canvas>
 
-                            <!-- 아래 화살표 -->
                             <RepeatButton x:Name="PART_LineDownCustom" Grid.Row="2"
                                           Style="{StaticResource DarkScrollArrow}"
                                           Content="&#x25BC;"/>
@@ -127,7 +117,6 @@
         <CommandBinding Command="NavigationCommands.BrowseStop" Executed="ClearAndFocusCommand_Executed"/>
     </Window.CommandBindings>
 
-    <!-- 커스텀 타이틀바를 위해 WindowChrome 사용 -->
     <WindowChrome.WindowChrome>
         <WindowChrome
             CaptionHeight="30"
@@ -139,20 +128,18 @@
 
     <Grid x:Name="RootGrid">
         <Grid.RowDefinitions>
-            <RowDefinition Height="36"/>  <!-- 타이틀바 -->
-            <RowDefinition Height="*"/>   <!-- 본문 -->
+            <RowDefinition Height="36"/>  
+            <RowDefinition Height="*"/>   
         </Grid.RowDefinitions>
 
-        <!-- ============ 타이틀바 ============ -->
         <Grid Grid.Row="0" Background="#252526">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto"/>  <!-- 아이콘 -->
-                <ColumnDefinition Width="Auto"/>  <!-- 앱 이름 -->
-                <ColumnDefinition Width="*"/>     <!-- 드래그 영역 -->
-                <ColumnDefinition Width="Auto"/>  <!-- 버튼들 -->
+                <ColumnDefinition Width="Auto"/>  
+                <ColumnDefinition Width="Auto"/>  
+                <ColumnDefinition Width="*"/>     
+                <ColumnDefinition Width="Auto"/>  
             </Grid.ColumnDefinitions>
 
-            <!-- 아이콘 -->
             <Image Grid.Column="0"
                    Source="/Assets/sun.ico"
                    Width="20" Height="20"
@@ -160,7 +147,6 @@
                    VerticalAlignment="Center"
                    WindowChrome.IsHitTestVisibleInChrome="True"/>
 
-            <!-- 앱 이름 + ▼ 통합 버튼 (클릭 시 메뉴 팝업) -->
             <Button Grid.Column="1"
                     x:Name="MenuDropdownButton"
                     Click="MenuDropdownButton_Click"
@@ -209,29 +195,23 @@
                 </StackPanel>
             </Button>
 
-            <!-- 가운데 영역은 드래그로 창 이동에 사용 (WindowChrome이 자동 처리) -->
-
-            <!-- 윈도우 제어 버튼 (상단·오른쪽 6px는 리사이즈 테두리로 비워둠) -->
             <StackPanel Grid.Column="3"
                         Orientation="Horizontal"
                         Margin="0,6,6,0"
                         WindowChrome.IsHitTestVisibleInChrome="True">
 
-                <!-- 최소화 -->
                 <Button x:Name="MinimizeButton"
                         Click="MinimizeButton_Click"
                         Style="{StaticResource TitleBarButtonStyle}"
                         Content="&#xE921;"
                         ToolTip="최소화"/>
 
-                <!-- 최대화 / 복원 -->
                 <Button x:Name="MaximizeButton"
                         Click="MaximizeButton_Click"
                         Style="{StaticResource TitleBarButtonStyle}"
                         Content="&#xE922;"
                         ToolTip="최대화"/>
 
-                <!-- 닫기 -->
                 <Button x:Name="CloseButton"
                         Click="CloseButton_Click"
                         Style="{StaticResource CloseButtonStyle}"
@@ -240,19 +220,17 @@
             </StackPanel>
         </Grid>
 
-        <!-- ============ 본문 영역 ============ -->
         <Grid Grid.Row="1" Margin="10,8,10,10">
             <Grid.LayoutTransform>
                 <ScaleTransform x:Name="ContentScale" ScaleX="1.0" ScaleY="1.0"/>
             </Grid.LayoutTransform>
             <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>  <!-- 상태 표시 -->
-                <RowDefinition Height="Auto"/>  <!-- 검색창 -->
-                <RowDefinition Height="*"/>     <!-- 결과 리스트 -->
-                <RowDefinition Height="Auto"/>  <!-- 하단 상태바 -->
+                <RowDefinition Height="Auto"/>  
+                <RowDefinition Height="Auto"/>  
+                <RowDefinition Height="*"/>     
+                <RowDefinition Height="Auto"/>  
             </Grid.RowDefinitions>
 
-            <!-- 인덱싱 중일 때 표시 -->
             <Border x:Name="StatusBanner"
                     Grid.Row="0"
                     Background="#2D2D30"
@@ -265,7 +243,6 @@
                         FontSize="12"/>
             </Border>
 
-            <!-- 검색창 -->
             <Border Grid.Row="1"
                     Background="#2D2D30"
                     CornerRadius="4"
@@ -355,7 +332,6 @@
                 </Grid>
             </Border>
 
-            <!-- 검색 히스토리 드롭다운 -->
             <Popup x:Name="HistoryPopup"
                    PlacementTarget="{Binding ElementName=SearchBox}"
                    Placement="Bottom"
@@ -448,7 +424,6 @@
                 </Border>
             </Popup>
 
-            <!-- 결과 리스트 -->
             <Border Grid.Row="2"
                     Background="#252526"
                     CornerRadius="4">
@@ -467,9 +442,7 @@
                         </Grid.ColumnDefinitions>
 
                         <Grid.Resources>
-                            <!-- 헤더 포커스: 컬럼 경계선 위치가 헤더마다 달라(안쪽 3.5px/바깥쪽),
-                                 좌우 여백을 개별 보정해 모든 헤더에서 경계선과의 간격이
-                                 동일(약 4.5px)하게 보이도록 한다. -->
+                            
                             <ControlTemplate x:Key="HeaderFocusDrv">
                                 <Rectangle Margin="5,3,8,3" StrokeThickness="1.5" Stroke="#E8E8EC"
                                            StrokeDashArray="1 2" SnapsToDevicePixels="True"/>
@@ -536,7 +509,6 @@
                                 </Setter>
                             </Style>
 
-                            <!-- 컬럼 경계 드래그용 Thumb 스타일: 가는 세로 구분선 + 좌우조절 커서 -->
                             <Style TargetType="Thumb" x:Key="ColumnSplitterStyle">
                                 <Setter Property="Width" Value="7"/>
                                 <Setter Property="HorizontalAlignment" Value="Right"/>
@@ -546,7 +518,6 @@
                                     <Setter.Value>
                                         <ControlTemplate TargetType="Thumb">
                                             <Border Background="{TemplateBinding Background}">
-                                                <!-- 가운데 1px 경계선 -->
                                                 <Border Width="1" HorizontalAlignment="Center"
                                                         Background="#6E6E76"/>
                                             </Border>
@@ -555,7 +526,6 @@
                                 </Setter>
                             </Style>
 
-                            <!-- 왼쪽 가장자리에 붙는 경계 (경로|크기 경계용) -->
                             <Style TargetType="Thumb" x:Key="ColumnSplitterStyleLeft"
                                    BasedOn="{StaticResource ColumnSplitterStyle}">
                                 <Setter Property="HorizontalAlignment" Value="Left"/>
@@ -568,21 +538,20 @@
                         <Button Grid.Column="3" x:Name="HdrSize" Style="{StaticResource HeaderButtonStyle}" FocusVisualStyle="{StaticResource FocusSize}" Padding="15,0" Tag="Size"  Click="HeaderButton_Click" Content="크기"/>
                         <Button Grid.Column="4" x:Name="HdrDate" Style="{StaticResource HeaderButtonStyle}" FocusVisualStyle="{StaticResource FocusDate}" Tag="Date"  Click="HeaderButton_Click" Content="수정 날짜"/>
 
-                        <!-- 컬럼 경계 드래그 핸들 -->
                         <Thumb Grid.Column="0" Style="{StaticResource ColumnSplitterStyle}"
                                Tag="ColDrive" DragDelta="ColumnSplitter_DragDelta" DragCompleted="ColumnSplitter_DragCompleted"/>
+                        
                         <Thumb Grid.Column="1" Style="{StaticResource ColumnSplitterStyle}"
                                Tag="ColName" DragDelta="ColumnSplitter_DragDelta" DragCompleted="ColumnSplitter_DragCompleted"/>
-                        <!-- 경로|크기 경계: 크기 컬럼 왼쪽에 배치. 드래그하면 크기 컬럼 너비를 반대로 조절 -->
+                        
                         <Thumb Grid.Column="3" Style="{StaticResource ColumnSplitterStyleLeft}"
                                Tag="ColSizeLeft" DragDelta="ColumnSplitter_DragDelta" DragCompleted="ColumnSplitter_DragCompleted"/>
-                        <!-- 크기|수정날짜 경계 -->
+                        
                         <Thumb Grid.Column="3" Style="{StaticResource ColumnSplitterStyle}"
                                Tag="ColSize" DragDelta="ColumnSplitter_DragDelta" DragCompleted="ColumnSplitter_DragCompleted"/>
                     </Grid>
 
                 <Grid>
-                    <!-- 가상화 ListView (헤더 없는 순수 행) -->
                     <ListView x:Name="ResultsList"
                             Background="Transparent"
                             Foreground="#DDDDDD"
@@ -714,7 +683,6 @@
                             </ContextMenu>
                         </ListView.ContextMenu>
                     </ListView>
-                    <!-- 검색 결과 0건일 때 안내 (검색 전에는 숨김) -->
                     <StackPanel x:Name="EmptyHint"
                                     VerticalAlignment="Center"
                                     HorizontalAlignment="Center"
@@ -737,7 +705,6 @@
                 </DockPanel>
             </Border>
 
-            <!-- 하단 상태바 -->
             <Border Grid.Row="3"
                     Background="#007ACC"
                     Margin="0,8,0,0"

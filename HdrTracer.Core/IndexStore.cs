@@ -6,7 +6,7 @@ namespace HdrTracer.Core;
 
 public static class IndexStore
 {
-    private const uint Magic = 0x43525448; // "HTRC" little-endian
+    private const uint Magic = 0x43525448;
     private const int Version = 4;
 
     public sealed class CacheData
@@ -39,7 +39,6 @@ public static class IndexStore
             bw.Write(Magic);
             bw.Write(Version);
 
-            // 드라이브 문자 (2 chars)
             bw.Write((char)data.DriveLetter[0]);
             bw.Write((char)data.DriveLetter[1]);
 
@@ -47,10 +46,8 @@ public static class IndexStore
             bw.Write(data.JournalId);
             bw.Write(data.LastUsn);
 
-            // 인덱스 직렬화
             data.Index.WriteTo(bw);
 
-            // ngram 저장 (있으면 1, 없으면 0)
             var ngram = data.Index.Ngram;
             if (ngram is not null)
             {
@@ -64,7 +61,6 @@ public static class IndexStore
             }
         }
 
-        // 원자적 교체
         if (File.Exists(path)) File.Delete(path);
         File.Move(tmp, path);
     }
@@ -92,7 +88,6 @@ public static class IndexStore
             var index = FileIndex.ReadFrom(br);
             index.DriveLetter = letter;
 
-            // ngram 읽기 (있으면 같이 로드)
             byte hasNgram = br.ReadByte();
             if (hasNgram == 1)
             {
@@ -112,7 +107,6 @@ public static class IndexStore
         }
         catch
         {
-            // 손상된 캐시 → 무시하고 null 반환 (어차피 다시 빌드)
             return null;
         }
     }
@@ -122,7 +116,6 @@ public static class IndexStore
         try { File.Delete(GetCachePath(driveLetter)); } catch { }
     }
 
-    // 드라이브 시리얼 번호 가져오기
     public static uint GetVolumeSerial(string driveLetter)
     {
         var sb = new System.Text.StringBuilder(261);

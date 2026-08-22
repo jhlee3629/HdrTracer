@@ -2,9 +2,6 @@ using System.Windows.Input;
 
 namespace HdrTracer.App;
 
-/// <summary>
-/// 간단한 ICommand 구현. 람다를 ICommand로 감싸기 위한 래퍼.
-/// </summary>
 public sealed class RelayCommand : ICommand
 {
     private readonly Action<object?> _execute;

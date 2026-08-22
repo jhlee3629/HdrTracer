@@ -1,12 +1,9 @@
 namespace HdrTracer.Core;
 
-// 언어별 문자열 사전 (Localization의 부분 클래스).
-// 새 언어를 추가하려면: 이 형식으로 파일 하나를 만들고 Localization.cs의 Table()에 한 줄 추가.
 public static partial class Localization
 {
     internal static readonly Dictionary<string, string> _ko = new()
     {
-        // 메뉴
         ["menu.settings"]     = "설정",
         ["menu.refresh"]      = "인덱스 새로 고침",
         ["menu.resetCols"]    = "컬럼 너비 초기화",
@@ -29,10 +26,8 @@ public static partial class Localization
         ["ctx.export"]        = "선택 항목 내보내기",
         ["export.done"]       = "{0}개 항목을 CSV로 저장했습니다.",
 
-        // 필터링 메뉴
         ["menu.filter"]  = "필터링",
 
-        // 타이틀바 버튼 툴팁
         ["tip.menu"]     = "메뉴",
         ["tip.minimize"] = "최소화",
         ["tip.maximize"] = "최대화",
@@ -45,7 +40,6 @@ public static partial class Localization
         ["empty.title"] = "결과가 없습니다",
         ["empty.body"]  = "검색어를 줄이거나 다르게 써보세요\n여러 단어는 모두 포함된 것만 찾습니다\n도움말: 메뉴(HdrTracer ▼) → 검색 도움말",
 
-        // 검색 결과 우클릭 메뉴
         ["ctx.open"]       = "열기",
         ["ctx.runAsAdmin"] = "관리자 권한으로 실행",
         ["ctx.openWith"]   = "다른 프로그램으로 열기",
@@ -76,7 +70,6 @@ public static partial class Localization
         ["ctx.error"]          = "오류",
         ["ctx.notExecutable"]  = "실행 가능한 파일이 아닙니다",
 
-        // 빠른 필터 버튼
         ["filter.doc"]   = "문서",
         ["filter.img"]   = "이미지",
         ["filter.media"] = "미디어",
@@ -96,14 +89,12 @@ public static partial class Localization
         ["filter.kind.folder"] = "폴더만",
         ["filter.kind.file"]   = "파일만",
 
-        // 컬럼 헤더
         ["col.drive"] = "DRV",
         ["col.name"]  = "이름",
         ["col.path"]  = "경로",
         ["col.size"]  = "크기",
         ["col.date"]  = "수정 날짜",
 
-        // 상태바 / 배너
         ["status.indexing"] = "드라이브 인덱싱 중...",
         ["status.total"]    = "총",
         ["status.items"]    = "개",
@@ -115,14 +106,12 @@ public static partial class Localization
         ["status.driveDone"]        = "{0} 완료({1:N0})",
         ["status.driveWorking"]     = "{0} 진행 중",
 
-        // 트레이
         ["tray.open"] = "HdrTracer 열기",
         ["tray.exit"] = "종료",
         ["tray.pinned"]       = "고정 검색",
         ["tray.pinned.empty"] = "고정된 검색 없음",
         ["tray.settings"]     = "설정",
 
-        // 설정 창
         ["settings.title"]      = "설정",
         ["settings.indexing"]   = "인덱싱",
         ["settings.usb"]        = "이동식 드라이브 인덱싱",
@@ -139,14 +128,12 @@ public static partial class Localization
         ["settings.autostart.fail"] = "자동 실행 설정 변경에 실패했습니다.",
         ["settings.excluded"]      = "검색에서 제외할 폴더 이름",
         ["settings.excluded.desc"] = "세미콜론(;)으로 구분. 이 이름의 폴더와 그 안의 모든 항목이 결과에서 숨겨집니다. 예: WinSxS; node_modules",
-        ["settings.hotkey"]      = "Global hotkey (Win+Alt+S)",
         ["settings.hotkey"]      = "전역 단축키 (Win+Alt+S)",
         ["settings.hotkey.desc"] = "어떤 앱을 쓰는 중에도 Win+Alt+S로 창을 불러옵니다. 창을 치울 때는 Esc를 쓰세요.",
         ["settings.restoreSearch"]      = "시작할 때 마지막 검색어 복원",
         ["settings.restoreSearch.desc"] = "앱을 다시 열면 마지막에 쓴 검색어로 검색된 상태로 시작합니다.",
         ["hotkey.fail"]          = "전역 단축키(Win+Alt+S) 등록 실패 — 다른 프로그램이 이 키를 사용 중일 수 있습니다.",
 
-        // 단축키 창
         ["sc.title"]        = "단축키",
         ["sc.appMenu"]      = "앱 메뉴",
         ["sc.openSettings"] = "설정 열기",
@@ -208,19 +195,40 @@ public static partial class Localization
             "폴더 검색은 결과를 우클릭해 '이 폴더에서만 검색'을 눌러도 됩니다.\n" +
             "경로만 입력하면 검색되지 않아요. 단어나 확장자와 함께 쓰세요.",
 
-        // 정보 창
         ["about.title"]   = "정보",
         ["about.version"] = "버전 {0}",
         ["about.desc"]    = "NTFS 파일 시스템을 직접 읽어 빠르게 검색하는 도구입니다.",
 
-        // 인덱스 새로 고침 다이얼로그
         ["refresh.confirm.msg"]   = "인덱스를 처음부터 새로 만듭니다.\n\n잠시 동안 검색이 멈출 수 있습니다. 계속하시겠어요?",
         ["refresh.confirm.title"] = "인덱스 새로 고침",
         ["refresh.fail"]          = "인덱스 새로 고침 실패",
 
-        // 공통
         ["common.error"] = "오류",
         ["common.ok"]     = "확인",
         ["common.cancel"] = "취소",
+
+        ["rd.report.title"]     = "삭제하지 못한 항목",
+        ["rd.perm.title"]       = "영구 삭제",
+        ["rd.perm.msg"]         = "휴지통으로 보낼 수 없는 항목이 {0}개 있습니다.\n\n영구히 삭제할까요?\n이 작업은 되돌릴 수 없습니다.",
+        ["rd.blockedAt"]        = "막힌 항목:",
+        ["rd.lock.unknown"]     = "사용 중인 프로그램을 찾지 못했습니다 (시스템이나 백신일 수 있습니다)",
+        ["rd.cause.locked"]     = "다른 프로그램이 사용 중",
+        ["rd.cause.denied"]     = "권한 없음",
+        ["rd.cause.badname"]    = "이름·경로가 비정상",
+        ["rd.cause.notempty"]   = "폴더가 비어 있지 않음",
+        ["rd.cause.notfound"]   = "이미 없음",
+        ["rd.cause.protected"]  = "시스템 보호 경로",
+        ["rd.cause.other"]      = "기타 오류",
+        ["rd.hint.locked"]      = "위에 표시된 프로그램을 닫고 다시 시도하세요.",
+        ["rd.hint.denied"]      = "소유권이 다른 계정(예: TrustedInstaller)에 있을 수 있습니다.",
+        ["rd.hint.badname"]     = "탐색기로는 다룰 수 없는 이름입니다. 영구 삭제를 허용하면 지울 수 있습니다.",
+        ["rd.hint.notempty"]    = "안의 항목 일부가 지워지지 않았습니다. 위의 다른 원인을 함께 보세요.",
+        ["rd.hint.protected"]   = "안전을 위해 영구 삭제로 올리지 않았습니다. 정말 필요하면 탐색기에서 직접 지우세요.",
+        ["rd.hint.notfound"]    = "이미 사라진 항목입니다.",
+        ["rd.hint.other"]       = "원인을 특정하지 못했습니다.",
+        ["dn.permOne"]          = "영구 삭제",
+        ["dn.permMulti"]        = "{0}개 항목을 영구 삭제했습니다.",
+        ["dn.mixed"]            = "{0}개 삭제 (영구 삭제 {1}개)",
+        ["dn.permSuffix"]       = "영구 삭제 {0}개",
     };
 }

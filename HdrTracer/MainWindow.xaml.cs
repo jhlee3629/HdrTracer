@@ -22,8 +22,6 @@ namespace HdrTracer.App;
 
 public partial class MainWindow : Window
 {
-    // 헤더와 모든 결과 행이 공유하는 컬럼 너비 소스 (SharedSizeGroup 대체).
-    // XAML이 RootWindow.Cols 로 바인딩한다.
     public ColumnWidths Cols { get; } = new();
 
     private readonly MultiDriveIndex _multi = new();
@@ -35,12 +33,8 @@ public partial class MainWindow : Window
     private long _searchSequence;
     private const int MaxDisplayResults = 1_000_000;
 
-    // 결과 리스트의 ContextMenu가 열려있는 동안에는 자동 재검색을 보류한다.
-    // (재검색 = ItemsSource 교체 = 선택 해제 → 메뉴 클릭 시 row=null이 되는 문제 방지)
     private bool _contextMenuOpen;
 
-    // 방금 휴지통으로 보낸 경로들. 삭제 직후 도는 자동 재검색이 (USN 인덱스 갱신 지연 때문에)
-    // 이 항목들을 잠깐 되살리는 것을 막아, 우클릭 삭제도 단축키처럼 즉시·깔끔하게 사라지게 한다.
     private readonly HashSet<string> _recentlyDeletedPaths =
         new(StringComparer.OrdinalIgnoreCase);
 
@@ -48,7 +42,7 @@ public partial class MainWindow : Window
     private SortColumn _sortColumn = SortColumn.Name;
     private bool _sortAscending = true; 
     private readonly List<MetadataPreloader> _preloaders = new();
-    // 각 슬롯의 캐시 메타정보 (저장할 때 필요)
+    
     private readonly Dictionary<string, (ulong JournalId, uint VolumeSerial)> _cacheMeta = new();
 
     private AppSettings _settings = AppSettings.Load();
@@ -68,28 +62,30 @@ public partial class MainWindow : Window
     private DateTime _ignoreIndexChangesUntil = DateTime.MinValue;
     private readonly DispatcherTimer _indexChangedDebounce;
     private readonly DispatcherTimer _preloadResumeTimer;
-    private long _lastSearchMs;  // 사용자가 직접 한 검색의 소요 시간(자동 재검색 시 유지)
+    private long _lastSearchMs;  
 
     private string _lastSearchQuery = "";
+
+    private int _runawayCount;
+
+    private List<SearchResultRow>? _lastRows;
+
+    private DateTime _runawayStart;
 
     public MainWindow()
     {
         InitializeComponent();
 
-        // 창 이동/크기조절 시 히스토리 팝업이 검색창을 따라오도록 재배치
         LocationChanged += (_, _) => RepositionHistoryPopup();
         SizeChanged     += (_, _) => RepositionHistoryPopup();
 
         StateChanged += MainWindow_StateChanged;
 
-        // 저장된 설정을 검색 엔진에 반영 (기본 false → 숨김+시스템 항목 숨김)
         _engine.HideHiddenSystemItems = !_settings.ShowHiddenSystemItems;
         _engine.ExcludedFolderNames = _settings.ExcludedFolders.ToArray();
 
-        // 저장된 컬럼 너비 복원
         ApplySavedColumnWidths();
 
-        // 저장된 정렬 상태 복원 (해석 실패 시 기본값 Name/오름차순 유지)
         if (Enum.TryParse<SortColumn>(_settings.SortColumn, out var savedSort))
             _sortColumn = savedSort;
         _sortAscending = _settings.SortAscending;
@@ -103,16 +99,13 @@ public partial class MainWindow : Window
         _indexChangedDebounce.Tick += (_, _) =>
         {
             _indexChangedDebounce.Stop();
-            // 사용자가 아직 한 번도 검색을 실행하지 않았으면 자동 갱신 안 함.
-            // (검색은 Enter/검색 버튼으로만 시작되어야 일관성 유지)
+            
             if (string.IsNullOrEmpty(_lastSearchQuery)) return;
-            // 검색창이 비었으면 갱신할 대상 없음
+            
             if (string.IsNullOrWhiteSpace(SearchBox.Text)) return;
-            // 현재 검색창 내용이 마지막으로 실행한 검색과 같을 때만 결과 갱신.
-            // (사용자가 새 검색어를 타이핑 중인데 자동 검색되는 것을 방지)
+            
             if (SearchBox.Text != _lastSearchQuery) return;
-            // 컨텍스트 메뉴가 열려 있으면 자동 재검색 보류 (선택 유지를 위해).
-            // 메뉴가 닫힐 때 다시 트리거된다.
+            
             if (_contextMenuOpen)
             {
                 _indexChangedDebounce.Start();
@@ -132,12 +125,6 @@ public partial class MainWindow : Window
         Closed += MainWindow_Closed;
         SourceInitialized += MainWindow_SourceInitialized;
 
-        // 앱 첫 활성화 시 검색창에 키보드 포커스 강제 (UAC 거친 시작에서 포커스가 가지 않는 문제 백업).
-        // 1회만 발동, 그 이후 활성화에는 영향 없음.
-        // 다른 앱으로 전환할 때 대량 선택은 미리 정리한다.
-        // WPF는 창 활성/비활성 때 선택 항목의 강조 상태를 항목 수만큼 갱신하는데,
-        // 수십만 건이 선택돼 있으면 그 처리만으로 앱이 멈춘 것처럼 보인다.
-        // (수천 건 이하는 그대로 두어 평소 작업 흐름은 유지)
         Deactivated += (_, _) =>
         {
             if (ResultsList.SelectedItems.Count > 2000)
@@ -166,7 +153,6 @@ public partial class MainWindow : Window
         _multi.SlotsChanged += () =>
             Dispatcher.BeginInvoke(UpdateFooterSummary);
 
-        // 메뉴 항목 단축키 (Ctrl+, → 설정, F5 → 인덱스 다시 빌드)
         InputBindings.Add(new KeyBinding(
             new RelayCommand(_ => SettingsButton_Click(this, new RoutedEventArgs())),
             Key.OemComma, ModifierKeys.Control));
@@ -175,64 +161,52 @@ public partial class MainWindow : Window
             new RelayCommand(async _ => await RebuildIndex()),
             Key.F5, ModifierKeys.None));
 
-         // 줌 단축키
         InputBindings.Add(new KeyBinding(
             new RelayCommand(_ => ZoomIn()),
-            Key.OemPlus, ModifierKeys.Control));   // Ctrl + +
+            Key.OemPlus, ModifierKeys.Control));   
         InputBindings.Add(new KeyBinding(
             new RelayCommand(_ => ZoomIn()),
-            Key.Add, ModifierKeys.Control));        // Ctrl + 숫자패드 +
-        // 고정 검색 단축키: Ctrl+1~9 → 고정 목록의 위에서 n번째 검색을 즉시 실행
+            Key.Add, ModifierKeys.Control));        
+        
         for (int i = 0; i < 9; i++)
         {
-            int idx = i;   // 클로저 캡처 (루프 변수 직접 캡처 금지)
+            int idx = i;   
             InputBindings.Add(new KeyBinding(
                 new RelayCommand(_ => RunPinnedSearch(idx)),
                 Key.D1 + i, ModifierKeys.Control));
             InputBindings.Add(new KeyBinding(
                 new RelayCommand(_ => RunPinnedSearch(idx)),
-                Key.NumPad1 + i, ModifierKeys.Control));   // 숫자패드도 지원
+                Key.NumPad1 + i, ModifierKeys.Control));   
         }
         InputBindings.Add(new KeyBinding(
             new RelayCommand(_ => ZoomOut()),
-            Key.OemMinus, ModifierKeys.Control));  // Ctrl + -
+            Key.OemMinus, ModifierKeys.Control));  
         InputBindings.Add(new KeyBinding(
             new RelayCommand(_ => ZoomOut()),
-            Key.Subtract, ModifierKeys.Control));   // Ctrl + 숫자패드 -
+            Key.Subtract, ModifierKeys.Control));   
         InputBindings.Add(new KeyBinding(
             new RelayCommand(_ => ZoomReset()),
-            Key.D0, ModifierKeys.Control));         // Ctrl + 0
+            Key.D0, ModifierKeys.Control));         
         InputBindings.Add(new KeyBinding(
             new RelayCommand(_ => ZoomReset()),
-            Key.NumPad0, ModifierKeys.Control));    // Ctrl + 숫자패드 0
+            Key.NumPad0, ModifierKeys.Control));    
 
-        // 저장된 배율 즉시 적용
         ApplyZoom(_settings.UiZoom);
 
-        // 저장된 언어 적용
         HdrTracer.Core.Localization.Current =
             HdrTracer.Core.Localization.FromCode(_settings.Language);
 
-        // 저장된 언어로 컬럼 헤더 등 초기 텍스트 반영
         ApplyLocalizedTexts();
     }
 
-    // ==================================================
-    //  WM_DEVICECHANGE 후크 등록 (창이 핸들 만들어진 직후)
-    // ==================================================
     private void MainWindow_SourceInitialized(object? sender, EventArgs e)
     {
         var src = (HwndSource)PresentationSource.FromVisual(this)!;
         _watcher.AttachTo(src);
 
-        // 작업 표시줄 준비 알림(TaskbarCreated) 구독.
-        // 자동 실행으로 로그인 직후 시작하면 탐색기(작업 표시줄)가 아직 준비 전이라
-        // 작업 표시줄 단추에 아이콘이 안 붙는 경우가 있다. 준비되면 다시 등록한다.
-        // (탐색기가 재시작될 때도 같은 알림이 오므로 그때도 복구된다)
         _taskbarCreatedMsg = RegisterWindowMessage("TaskbarCreated");
         src.AddHook(TaskbarCreatedHook);
 
-        // 글로벌 단축키 (Win + Alt + S) — 설정에서 켠 경우에만 등록 (기본 켜짐)
         if (_settings.GlobalHotkeyEnabled)
             RegisterGlobalHotkey();
     }
@@ -247,7 +221,6 @@ public partial class MainWindow : Window
     {
         if (_taskbarCreatedMsg != 0 && (uint)msg == _taskbarCreatedMsg)
         {
-            // 작업 표시줄 단추를 다시 만들게 해서 아이콘이 붙도록 한다
             _ = Dispatcher.BeginInvoke(new Action(RefreshTaskbarButton),
                     System.Windows.Threading.DispatcherPriority.Background);
         }
@@ -260,12 +233,11 @@ public partial class MainWindow : Window
         {
             bool wasVisible = Visibility == Visibility.Visible;
             ShowInTaskbar = false;
-            ShowInTaskbar = wasVisible;   // 숨어 있는 상태(트레이)면 단추를 만들지 않는다
+            ShowInTaskbar = wasVisible;   
         }
-        catch { /* 실패해도 앱 동작에는 영향 없음 */ }
+        catch { }
     }
 
-    /// <summary>전역 단축키(Win+Alt+S)를 등록. 실패하면(다른 앱과 충돌 등) 하단에 안내.</summary>
     private void RegisterGlobalHotkey()
     {
         try
@@ -278,7 +250,7 @@ public partial class MainWindow : Window
 
             bool ok = _globalHotkey.Register(
                 GlobalHotkey.Modifiers.Win | GlobalHotkey.Modifiers.Alt,
-                0x53);   // S
+                0x53);   
 
             if (!ok)
                 ShowFooterNotice(Loc.T("hotkey.fail"));
@@ -291,20 +263,16 @@ public partial class MainWindow : Window
 
     private void UnregisterGlobalHotkey()
     {
-        try { _globalHotkey?.Unregister(); } catch { /* 무시 */ }
+        try { _globalHotkey?.Unregister(); } catch { }
     }
 
-    // 전역 단축키(Win+Alt+S)로 창 불러오기 — "앞으로 가져오기"만 한다.
-    // 토글로 만들면 창이 다른 앱 뒤에 있을 때 첫 입력이 "숨기기"로 해석돼
-    // 아무 일도 일어나지 않은 것처럼 보인다(두 번째부터 동작하는 현상의 원인).
-    // 창을 치울 때는 Esc(단계 동작) 또는 트레이 아이콘 클릭을 쓴다.
     private void SummonWindow()
     {
         if (Visibility != Visibility.Visible) Show();
         if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
 
         Activate();
-        _trayIcon?.ForceForegroundPublic();   // 포그라운드 잠금 보완 (Activate 무시 방지)
+        _trayIcon?.ForceForegroundPublic();   
         Topmost = true;
         Topmost = false;
         Focus();
@@ -316,7 +284,6 @@ public partial class MainWindow : Window
     {
         if (Visibility != Visibility.Visible || WindowState == WindowState.Minimized)
         {
-            // 안 보임 → 보이기 + 검색창 포커스
             if (Visibility != Visibility.Visible) Show();
             if (WindowState == WindowState.Minimized) WindowState = WindowState.Normal;
 
@@ -329,7 +296,6 @@ public partial class MainWindow : Window
         }
         else
         {
-            // 보임 + 활성화 → 숨김 (트레이로)
             if (_settings.MinimizeToTrayOnClose && _trayIcon is not null)
             {
                 _trayIcon.HideWindow();
@@ -341,9 +307,6 @@ public partial class MainWindow : Window
         }
     }
 
-    // ==================================================
-    //  앱 로드 → 시작 시점 드라이브 인덱싱
-    // ==================================================
     private async void MainWindow_Loaded(object sender, RoutedEventArgs e)
     {   
         var drives = DriveDetector.GetIndexableDrives(_settings.IndexRemovableDrives);
@@ -365,25 +328,22 @@ public partial class MainWindow : Window
 
         var totalSw = Stopwatch.StartNew();
 
-        StartIndexingProgress();   // 1초마다 경과·드라이브별 상태 표시
+        StartIndexingProgress();   
         var tasks = _multi.Slots.Select(slot => Task.Run(() => BuildOneDrive(slot))).ToArray();
         await Task.WhenAll(tasks);
         StopIndexingProgress();
         totalSw.Stop();
 
-        // 모니터 시작
         foreach (var slot in _multi.Slots)
         {
             StartMonitorIfReady(slot);
             StartMetadataPreloader(slot);
         }
 
-        // 트레이 아이콘 (인덱싱 다 끝나고 나서 초기화)
         try
         {
             _trayIcon = new TrayIconHelper(this);
 
-            // 트레이 메뉴: 고정 검색 목록 공급 + 항목 클릭 시 소환·실행, 설정 열기
             _trayIcon.PinnedSearchesProvider = () => _settings.PinnedSearches;
             _trayIcon.PinnedSearchRequested += (_, idx) =>
             {
@@ -410,9 +370,7 @@ public partial class MainWindow : Window
         UpdateFooterSummary();
 
         SearchBox.IsEnabled = true;
-        // 앱 시작 직후엔 윈도우가 키보드 포커스를 못 받은 상태일 수 있다 (특히 UAC 거쳐서 시작된 경우).
-        // 단순 Focus()로는 부족하므로 Dispatcher로 미뤄서 Activate + Keyboard.Focus 강제.
-        // (반환된 DispatcherOperation은 await 불필요. fire-and-forget.)
+        
         _ = Dispatcher.BeginInvoke(new Action(() =>
         {
             Activate();
@@ -420,7 +378,6 @@ public partial class MainWindow : Window
             Keyboard.Focus(SearchBox);
         }), System.Windows.Threading.DispatcherPriority.Input);
 
-        // 설정이 켜져 있으면 마지막 검색어를 복원해 바로 실행 (기본 꺼짐)
         if (_settings.RestoreLastSearch && !string.IsNullOrWhiteSpace(_settings.LastSearchQuery))
         {
             SearchBox.Text = _settings.LastSearchQuery;
@@ -429,9 +386,6 @@ public partial class MainWindow : Window
         }
     }
 
-    // ── 인덱싱 진행 표시 ──────────────────────────────
-    // 인덱싱은 드라이브 크기·파일 수에 따라 수 초~수십 초가 걸린다.
-    // 그동안 "멈춘 것"처럼 보이지 않도록 1초마다 경과 시간과 드라이브별 상태를 갱신한다.
     private System.Windows.Threading.DispatcherTimer? _indexProgressTimer;
     private Stopwatch? _indexProgressSw;
 
@@ -480,7 +434,6 @@ public partial class MainWindow : Window
         {
             uint volSerial = IndexStore.GetVolumeSerial(slot.DriveLetter);
 
-            // 1) 캐시 시도
             var cached = IndexStore.TryLoad(slot.DriveLetter);
             if (cached is not null
                 && cached.VolumeSerial == volSerial
@@ -495,7 +448,6 @@ public partial class MainWindow : Window
                     slot.BuildMs = sw.ElapsedMilliseconds;
                     _cacheMeta[slot.DriveLetter] = (cached.JournalId, volSerial);
 
-                    // ngram이 캐시에 없으면 (구버전 캐시) 빌드
                     if (slot.Index.Ngram is null)
                     {
                         slot.Index.BuildNgramIndex();
@@ -511,9 +463,8 @@ public partial class MainWindow : Window
                 }
             }
 
-            // 2) 풀 빌드 (RawMftReader가 내부에서 LinkParents까지 완료)
             var (idx, journalId, startUsn) = RawMftReader.BuildIndexWithJournalInfo(slot.DriveLetter);
-            idx.BuildNgramIndex();   // ngram 빌드
+            idx.BuildNgramIndex();   
             slot.Index = idx;
             slot.BuildMs = sw.ElapsedMilliseconds;
             _cacheMeta[slot.DriveLetter] = (journalId, volSerial);
@@ -538,8 +489,6 @@ public partial class MainWindow : Window
             monitor.Start();
             slot.Monitor = monitor;
 
-            // 이 볼륨 핸들을 안전 제거 알림에 등록 → 사용자가 "꺼내기"를 누르면
-            // Windows가 DriveQueryRemove를 보내고, 그때 핸들을 닫아 안전 제거가 성공한다.
             _watcher.RegisterVolumeHandle(slot.DriveLetter, monitor.VolumeHandle);
         }
         catch (Exception ex)
@@ -557,15 +506,8 @@ public partial class MainWindow : Window
         preloader.Start();
     }
 
-    // ==================================================
-    //  드라이브 동적 감지
-    // ==================================================
     private async void OnDriveArrived(string driveLetter)
     {
-        // UI 스레드에서 호출됨 (HwndSource hook). 하지만 인덱싱은 백그라운드.
-        // USB는 꽂힌 직후 OS 마운트가 끝나기 전이라, 그 순간엔 NTFS·볼륨 정보가
-        // 아직 안 잡혀 인덱싱 가능 목록에서 빠질 수 있다. 바로 포기하지 말고
-        // 짧은 간격으로 몇 번 재확인하여 마운트가 끝나길 기다린다.
         bool isIndexable = false;
         for (int attempt = 0; attempt < 8; attempt++)
         {
@@ -575,7 +517,7 @@ public partial class MainWindow : Window
                 isIndexable = true;
                 break;
             }
-            await Task.Delay(500); // 0.5초 간격, 최대 8회(약 4초)까지 대기
+            await Task.Delay(500); 
         }
         if (!isIndexable)
         {
@@ -591,9 +533,8 @@ public partial class MainWindow : Window
 
         var slot = new MultiDriveIndex.DriveSlot { DriveLetter = driveLetter };
         _multi.AddSlot(slot);
-        UpdateFooterSummary();   // "인덱싱 중..." 비슷한 표시 갱신
+        UpdateFooterSummary();   
 
-        // 비동기 빌드
         await Task.Run(() => BuildOneDrive(slot));
 
         StartMonitorIfReady(slot);
@@ -601,9 +542,6 @@ public partial class MainWindow : Window
 
         UpdateFooterSummary();
 
-        // USB 인덱스 빌드가 끝났으니, 활성 검색이 있으면 결과를 자동 갱신한다.
-        // 파일 변경 라이브 갱신과 동일한 디바운스 경로(OnIndexChanged)를 재사용해
-        // 인덱스가 안정된 직후 안정적으로 재검색되게 한다.
         if (!string.IsNullOrEmpty(_lastSearchQuery))
         {
             if (SearchBox.Text != _lastSearchQuery)
@@ -616,12 +554,10 @@ public partial class MainWindow : Window
     {
         if (!_multi.ContainsDrive(driveLetter)) return;
 
-        _watcher.UnregisterVolume(driveLetter);  // 알림 등록 해제 (핸들 닫기 전)
+        _watcher.UnregisterVolume(driveLetter); 
         _multi.RemoveDrive(driveLetter);
         UpdateFooterSummary();
 
-        // USB가 분리되면, 마지막으로 실행한 검색 기준으로 결과를 자동 갱신
-        // (사라진 드라이브의 항목이 결과에서 빠지도록)
         if (!string.IsNullOrEmpty(_lastSearchQuery))
         {
             if (SearchBox.Text != _lastSearchQuery)
@@ -630,21 +566,12 @@ public partial class MainWindow : Window
         }
     }
 
-    // 안전 제거(꺼내기) 시도 직전. 이 드라이브의 USN 모니터 핸들을 즉시 풀어줘서
-    // Windows가 "사용 중" 거부 없이 분리할 수 있게 한다. RemoveDrive 내부에서
-    // 해당 슬롯의 Monitor를 Dispose하므로 볼륨 핸들이 닫힌다. (그냥 뽑는 경우엔
-    // DBT_DEVICEREMOVECOMPLETE → OnDriveRemoved가 처리하므로 중복돼도 안전)
-    // 안전 제거(꺼내기) 시도 직전 호출. 이 드라이브가 잡고 있는 모든 것을 풀어줘서
-    // Windows가 "사용 중" 거부 없이 분리하게 한다:
-    //  1) 알림 등록 해제  2) 메타 사전로더 중지  3) USN 모니터 핸들 Dispose
     private void OnDriveQueryRemove(string driveLetter)
     {
         if (!_multi.ContainsDrive(driveLetter)) return;
 
-        // 1) 디바이스 알림 등록 해제 (핸들 닫기 전에)
         _watcher.UnregisterVolume(driveLetter);
 
-        // 2) 이 드라이브의 메타데이터 사전로더 중지 (USB 파일 접근 중단)
         for (int i = _preloaders.Count - 1; i >= 0; i--)
         {
             if (string.Equals(_preloaders[i].DriveLetter, driveLetter, StringComparison.OrdinalIgnoreCase))
@@ -654,7 +581,6 @@ public partial class MainWindow : Window
             }
         }
 
-        // 3) USN 모니터 핸들 해제 (RemoveDrive 내부에서 Monitor.Dispose → 볼륨 핸들 닫힘)
         _multi.RemoveDrive(driveLetter);
         UpdateFooterSummary();
 
@@ -666,12 +592,9 @@ public partial class MainWindow : Window
         }
     }
 
-    // ==================================================
-    //  하단 상태바 요약
-    // ==================================================
     private void UpdateFooterSummary()
     {
-        if (DateTime.UtcNow < _footerNoticeUntil) return;   // 알림 문구 보호 중엔 덮지 않음
+        if (DateTime.UtcNow < _footerNoticeUntil) return; 
 
         var slots = _multi.Slots;
         if (slots.Count == 0)
@@ -692,19 +615,13 @@ public partial class MainWindow : Window
         FooterText.Text = $"{summary} = {Loc.T("status.total")} {total:N0}{Loc.T("status.items")}";
     }
 
-    // ==================================================
-    //  검색 (디바운스)
-    // ==================================================
     private void SearchBox_TextChanged(object sender, TextChangedEventArgs e)
     {
         if (SearchPlaceholder != null)
             SearchPlaceholder.Visibility = string.IsNullOrEmpty(SearchBox.Text) ? Visibility.Visible : Visibility.Collapsed;
 
-        // 입력이 시작되면 히스토리 팝업은 닫는다
         if (!string.IsNullOrEmpty(SearchBox.Text) && HistoryPopup.IsOpen)
             HistoryPopup.IsOpen = false;
-
-        // 자동 검색 안 함. 검색은 검색 버튼 또는 Enter로만 실행.
     }
 
     private void DebounceTimer_Tick(object? sender, EventArgs e)
@@ -713,7 +630,6 @@ public partial class MainWindow : Window
         RunSearch();
     }
 
-    // 필터 그룹 → 검색창에 확장자 문법 자동 입력
     private static readonly Dictionary<string, string> _filterGroups = new()
     {
         ["doc"]   = "*.pdf *.doc *.docx *.xls *.xlsx *.ppt *.pptx *.txt *.hwp *.hwpx",
@@ -727,13 +643,11 @@ public partial class MainWindow : Window
     {
         if (!_filterGroups.TryGetValue(key, out var pattern)) return;
 
-        // 검색창에서 기존 확장자 토큰은 제거하고 텍스트만 유지
         var keep = string.Join(" ",
             SearchBox.Text.Split(' ', StringSplitOptions.RemoveEmptyEntries)
                 .Where(t => !t.StartsWith("*.") &&
                             !(t.StartsWith(".") && t.Length > 1 && !t.Contains('\\'))));
 
-        // 새 확장자 패턴을 앞에 붙이고 텍스트 유지
         SearchBox.Text = string.IsNullOrWhiteSpace(keep)
             ? pattern
             : $"{pattern} {keep}";
@@ -741,14 +655,10 @@ public partial class MainWindow : Window
         SearchBox.CaretIndex = SearchBox.Text.Length;
         SearchBox.Focus();
 
-        // 자동 검색이 없으므로 필터 선택 시 즉시 검색 실행
         HistoryPopup.IsOpen = false;
         RunSearch();
     }
 
-    // 크기/날짜 조건 토큰을 검색창에 넣는다. 같은 종류의 기존 조건은 교체, token이 null이면 제거만.
-    // (조건 토큰 구분: '>' 또는 '<'로 시작하고, 끝이 B/KB/MB/GB/TB면 크기, 아니면 날짜)
-    // 폴더만/파일만 토큰(folder: / file:)을 검색창에 넣는다. token이 null이면 제거만.
     private void ApplyKindFilter(string? token)
     {
         var kept = SplitQueryTokens(SearchBox.Text)
@@ -757,7 +667,6 @@ public partial class MainWindow : Window
                      && !t.Equals("file:", StringComparison.OrdinalIgnoreCase))
             .ToList();
 
-        // SplitQueryTokens가 따옴표를 벗기므로, 공백 포함 토큰(경로)은 따옴표 복원
         for (int i = 0; i < kept.Count; i++)
             if (kept[i].Contains(' ')) kept[i] = "\"" + kept[i] + "\"";
 
@@ -775,13 +684,12 @@ public partial class MainWindow : Window
         var kept = SplitQueryTokens(SearchBox.Text)
             .Where(t =>
             {
-                if (t.Length < 2 || (t[0] != '>' && t[0] != '<')) return true;  // 조건 토큰 아님 → 유지
+                if (t.Length < 2 || (t[0] != '>' && t[0] != '<')) return true;  
                 bool tokenIsSize = char.ToUpperInvariant(t[^1]) == 'B';
-                return tokenIsSize != isSize;                                    // 같은 종류만 제거
+                return tokenIsSize != isSize;                                   
             })
             .ToList();
 
-        // SplitQueryTokens가 따옴표를 벗기므로, 공백 포함 토큰(경로)은 따옴표 복원
         for (int i = 0; i < kept.Count; i++)
             if (kept[i].Contains(' ')) kept[i] = "\"" + kept[i] + "\"";
 
@@ -794,11 +702,8 @@ public partial class MainWindow : Window
         RunSearch();
     }
 
-    // ===== 검색 히스토리 =====
     private const int MaxHistory = 10;
 
-    // 키보드 ↓/↑ 로 히스토리 항목을 "강조"만 할 때 true.
-    // HistoryList_SelectionChanged 의 "선택 즉시 검색 실행"을 건너뛰기 위한 가드.
     private bool _historyKeyboardNav;
 
     private void AddToHistory(string query)
@@ -807,11 +712,9 @@ public partial class MainWindow : Window
         if (string.IsNullOrWhiteSpace(query)) return;
 
         var h = _settings.SearchHistory;
-        // 중복 제거 (대소문자 무시) 후 맨 앞에 추가
         h.RemoveAll(x => string.Equals(x, query, StringComparison.OrdinalIgnoreCase));
         h.Insert(0, query);
 
-        // 최근 10개만 유지
         while (h.Count > MaxHistory)
             h.RemoveAt(h.Count - 1);
 
@@ -826,7 +729,6 @@ public partial class MainWindow : Window
             return;
         }
 
-        // 고정 검색을 위에, 일반 히스토리를 아래에 (고정과 같은 검색어는 히스토리에서 숨김)
         var pinned = _settings.PinnedSearches;
         var items = new List<HistoryItem>();
         foreach (var p in pinned)
@@ -849,7 +751,6 @@ public partial class MainWindow : Window
                 System.Windows.Threading.DispatcherPriority.Loaded);
     }
 
-    // WPF Popup은 창 이동을 자동으로 따라오지 않음 → 오프셋을 살짝 바꿨다 되돌려 위치 재계산 유도
     private void RepositionHistoryPopup()
     {
         if (!HistoryPopup.IsOpen) return;
@@ -860,7 +761,6 @@ public partial class MainWindow : Window
 
     private void SearchButton_Click(object sender, RoutedEventArgs e)
     {
-        // 검색 버튼: 즉시 검색 (히스토리 기록은 RunSearch가 담당)
         HistoryPopup.IsOpen = false;
         _debounceTimer.Stop();
         RunSearch();
@@ -874,8 +774,6 @@ public partial class MainWindow : Window
 
     private void HistoryList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        // 키보드 ↓/↑ 로 강조만 이동한 경우엔 즉시 검색하지 않고 Enter 입력을 기다린다.
-        // (마우스 클릭 선택은 _historyKeyboardNav 가 false 이므로 기존대로 즉시 실행된다.)
         if (_historyKeyboardNav)
         {
             _historyKeyboardNav = false;
@@ -891,7 +789,6 @@ public partial class MainWindow : Window
         SearchBox.CaretIndex = SearchBox.Text.Length;
         SearchBox.Focus();
 
-        // 검색 실행 (히스토리 기록/순서 갱신은 RunSearch가 담당)
         RunSearch();
     }
 
@@ -899,17 +796,15 @@ public partial class MainWindow : Window
     {
         if (sender is not Button btn || btn.Tag is not HistoryItem item) return;
 
-        // ✕ = 완전 삭제: 고정 목록과 히스토리 양쪽에서 제거
-        // (고정된 검색어도 히스토리에 남아 있어, 한쪽만 지우면 "고정 해제"처럼 보인다)
         _settings.PinnedSearches.RemoveAll(
             x => string.Equals(x, item.Query, StringComparison.OrdinalIgnoreCase));
         _settings.SearchHistory.RemoveAll(
             x => string.Equals(x, item.Query, StringComparison.OrdinalIgnoreCase));
         _settings.Save();
 
-        ShowHistoryPopup();   // 목록 재구성 (전부 비면 스스로 닫음)
+        ShowHistoryPopup();  
 
-        e.Handled = true;  // ListBox 선택으로 전파 방지
+        e.Handled = true;  
     }
 
     private void HistoryPin_Click(object sender, RoutedEventArgs e)
@@ -919,10 +814,10 @@ public partial class MainWindow : Window
         var p = _settings.PinnedSearches;
         p.RemoveAll(x => string.Equals(x, item.Query, StringComparison.OrdinalIgnoreCase));
         if (!item.IsPinned)
-            p.Insert(0, item.Query);   // 고정: 맨 위로
+            p.Insert(0, item.Query);  
         _settings.Save();
 
-        ShowHistoryPopup();   // 팝업 열린 채 목록만 갱신
+        ShowHistoryPopup();   
 
         e.Handled = true;
     }
@@ -931,9 +826,8 @@ public partial class MainWindow : Window
     {
         var query = SearchBox.Text;
 
-        if (!isAuto) _footerNoticeUntil = DateTime.MinValue;   // 직접 행동 → 알림 보호 해제
+        if (!isAuto) _footerNoticeUntil = DateTime.MinValue; 
 
-        // 검색 시작 → 사전로딩 일시 중단, 검색 끝난 후 1.5초 뒤 재개
         foreach (var p in _preloaders) p.Pause();
         _preloadResumeTimer.Stop();   
 
@@ -947,7 +841,6 @@ public partial class MainWindow : Window
             return;
         }
 
-        // 이전 검색 취소
         _searchCts?.Cancel();
         var cts = new CancellationTokenSource();
         _searchCts = cts;
@@ -957,7 +850,6 @@ public partial class MainWindow : Window
         {
             var sw = Stopwatch.StartNew();
 
-            // 1) 검색 자체는 백그라운드에서 (확장자 필터는 엔진이 처리)
             var hits = await Task.Run(() =>
             {
                 cts.Token.ThrowIfCancellationRequested();
@@ -969,7 +861,6 @@ public partial class MainWindow : Window
 
             if (mySeq != _searchSequence) return;
 
-            // 2) 행 객체는 즉시 생성 (Lazy라 빠름)
             var rows = new List<SearchResultRow>(hits.Count);
             foreach (var hit in hits)
             {
@@ -985,13 +876,10 @@ public partial class MainWindow : Window
 
             if (mySeq != _searchSequence) return;
 
-            // 3) 정렬 (백그라운드)
             var sortedRows = await Task.Run(() => SortRows(rows), cts.Token);
 
             if (mySeq != _searchSequence) return;
 
-            // 방금 삭제한 항목이 인덱스 갱신 지연으로 잠깐 되살아나는 것을 막는다.
-            // 파일이 디스크에 다시 존재하면(복원 등) 추적을 풀어 정상 표시한다.
             if (_recentlyDeletedPaths.Count > 0)
             {
                 sortedRows = sortedRows.Where(r =>
@@ -1006,18 +894,15 @@ public partial class MainWindow : Window
                 }).ToList();
             }
 
-            // 갱신 전 선택을 기억 (경로 기준)
             var prevSelectedPaths = new HashSet<string>(
                 ResultsList.SelectedItems.OfType<SearchResultRow>().Select(r => r.Path),
                 StringComparer.OrdinalIgnoreCase);
 
-            // 4) UI 즉시 표시
             sw.Stop();
             SetResultRows(sortedRows);
             EmptyHint.Visibility = sortedRows.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
             _lastSearchQuery = query;
 
-            // 이전 선택 복원: 새 결과 중에서 같은 경로를 가진 행을 다시 선택
             if (prevSelectedPaths.Count > 0)
             {
                 ResultsList.SelectedItems.Clear();
@@ -1028,18 +913,12 @@ public partial class MainWindow : Window
                 }
             }
 
-            // 검색은 명시적 동작(버튼/Enter/필터/히스토리)으로만 실행되므로
-            // 결과가 있으면 히스토리에 기록한다.
             if (sortedRows.Count > 0 && !string.IsNullOrWhiteSpace(query))
                 AddToHistory(query);
 
-            // 검색 끝남 → 3초 후 사전로딩 재개
             _preloadResumeTimer.Stop();
             _preloadResumeTimer.Start();
 
-            // 사용자가 직접 한 검색일 때만 소요 시간을 갱신한다.
-            // 자동 재검색(인덱스 변경)일 때는 직전 시간을 그대로 유지해서,
-            // "가만히 있는데 시간이 바뀌는" 현상을 막는다.
             if (!isAuto)
                 _lastSearchMs = sw.ElapsedMilliseconds;
 
@@ -1050,7 +929,6 @@ public partial class MainWindow : Window
                         System.Windows.Threading.DispatcherPriority.Loaded);
             }
 
-            // 직접 검색은 즉시 갱신. 자동 재검색은 최근 알림(삭제 결과 등)을 3초간 존중.
             if (!isAuto || DateTime.UtcNow >= _footerNoticeUntil)
             {
                 FooterText.Text = sortedRows.Count >= MaxDisplayResults
@@ -1058,17 +936,16 @@ public partial class MainWindow : Window
                     : $"{sortedRows.Count:N0} {Loc.T("status.results")} ({_lastSearchMs}ms)";
             }
 
-            _footerBeforeSelection = null;   // 새 검색 → 이전 선택 요약의 복원 문구 무효화
+            _footerBeforeSelection = null; 
         }
         catch (OperationCanceledException)
         { }
     }
 
-    // Ctrl+1~9: 고정 검색 실행. 번호는 히스토리 팝업의 📌 목록 순서(위에서부터).
     private void RunPinnedSearch(int index)
     {
         var p = _settings.PinnedSearches;
-        if (index < 0 || index >= p.Count) return;   // 그 번호에 고정 검색 없으면 무시
+        if (index < 0 || index >= p.Count) return; 
 
         SearchBox.Text = p[index];
         SearchBox.CaretIndex = SearchBox.Text.Length;
@@ -1085,9 +962,6 @@ public partial class MainWindow : Window
         });
     }
 
-    // ==================================================
-    //  컬럼 정렬
-    // ==================================================
     private async void HeaderButton_Click(object sender, RoutedEventArgs e)
     {
         if (sender is not Button btn || btn.Tag is not string tag) return;
@@ -1103,32 +977,26 @@ public partial class MainWindow : Window
             _ => SortColumn.Name
         };
 
-        bool sameColumnToggle = (newCol == _sortColumn);   // 같은 컬럼 재클릭 = 방향만 반전
+        bool sameColumnToggle = (newCol == _sortColumn); 
 
         if (sameColumnToggle)
         {
-            // 같은 컬럼 다시 클릭 → 정렬 방향 토글
             _sortAscending = !_sortAscending;
         }
         else
         {
-            // 다른 컬럼 클릭 → 새 컬럼 오름차순
             _sortColumn = newCol;
             _sortAscending = true;
         }
 
-        // 정렬 상태 저장 (재시작 시 복원)
         _settings.SortColumn = _sortColumn.ToString();
         _settings.SortAscending = _sortAscending;
         _settings.Save();
 
-        // 현재 검색 결과를 다시 정렬해서 표시.
         if (ResultsList.ItemsSource is List<SearchResultRow> currentRows)
         {
             if (sameColumnToggle)
             {
-                // 같은 컬럼 방향 반전: 이미 그 컬럼으로 정렬돼 있으니
-                // 뒤집기만 한다 (수십만 건도 즉시)
                 var reversed = new List<SearchResultRow>(currentRows.Count);
                 for (int i = currentRows.Count - 1; i >= 0; i--)
                     reversed.Add(currentRows[i]);
@@ -1136,8 +1004,6 @@ public partial class MainWindow : Window
             }
             else
             {
-                // 다른 컬럼: 결과가 수십만 건이면 정렬에 수백 ms가 걸릴 수 있어,
-                // 검색 경로(RunSearch)와 동일하게 백그라운드에서 정렬 (UI 멈춤 방지)
                 System.Windows.Input.Mouse.OverrideCursor = System.Windows.Input.Cursors.Wait;
                 try
                 {
@@ -1152,29 +1018,20 @@ public partial class MainWindow : Window
         }
     }
 
-    // 결과 리스트의 세로 스크롤바 유무에 맞춰 헤더 오른쪽 여백(16px) 컬럼을 동적으로 조정.
-    // 스크롤바가 없을 때 크기/날짜 데이터가 헤더와 어긋나는 문제 방지.
     private void ResultsList_ScrollChanged(object sender, ScrollChangedEventArgs e)
     {
         if (e.OriginalSource is not ScrollViewer sv) return;
 
-        // 보정값은 스크롤바 실제 폭과 같아야 한다 (DarkScrollBar 스타일의 Width=11)
         double w = sv.ComputedVerticalScrollBarVisibility == Visibility.Visible ? 11 : 0;
         var lastCol = HeaderGrid.ColumnDefinitions[^1];
         if (lastCol.Width.Value != w)
             lastCol.Width = new GridLength(w);
     }
 
-    // 컬럼 경계 드래그 → 경계 양쪽 컬럼을 함께 조절 (고전적 분할선 동작).
-    // 경계를 끌면 왼쪽 칸은 커지고 오른쪽 칸은 그만큼 줄어, 경계선만 움직이고
-    // 나머지 컬럼은 그대로 유지된다. (경로는 * 채움이라 자동으로 흡수)
-    // SharedSizeGroup 덕분에 헤더 너비만 바꾸면 모든 행이 자동으로 따라온다.
     private const double MinColumnWidth = 30;
 
-    // 직전 DragDelta 시점의 마우스 X (HeaderGrid 기준). 드래그 시작 시 -1.
     private double _lastDragMouseX = -1;
 
-    // 각 컬럼의 최소 너비 (그룹별)
     private static double MinWidthOf(string group) => group switch
     {
         "ColDrive" => 40,
@@ -1191,7 +1048,6 @@ public partial class MainWindow : Window
         if (sender is not System.Windows.Controls.Primitives.Thumb thumb) return;
         if (thumb.Tag is not string tag) return;
 
-        // 고정된 HeaderGrid 기준 마우스 절대 X의 프레임 간 변화량을 delta로 쓴다.
         double mouseX = System.Windows.Input.Mouse.GetPosition(HeaderGrid).X;
         if (_lastDragMouseX < 0)
         {
@@ -1213,8 +1069,6 @@ public partial class MainWindow : Window
         }
     }
 
-    // 별(*) 가중치를 현재 실제 렌더 픽셀로 재설정(화면 변화 없음).
-    // 창 크기 변경 후 드래그할 때 무관한 컬럼이 출렁이는 것을 방지.
     private void NormalizeColumnWeights()
     {
         Cols.SetDrive(HeaderActualWidth(0));
@@ -1240,9 +1094,6 @@ public partial class MainWindow : Window
         _settings.Save();
     }
 
-    // 시작 시: 저장된 컬럼 너비를 Cols에 적용.
-    // 다섯 값이 모두 정상일 때만 "한 세트"로 적용한다 — 일부만 적용하면
-    // 옛 저장값과 기본값이 섞여 비율(별 가중치)이 틀어지기 때문.
     private void ApplySavedColumnWidths()
     {
         bool allValid =
@@ -1252,7 +1103,7 @@ public partial class MainWindow : Window
             _settings.ColWidthSize  >= MinWidthOf("ColSize")  &&
             _settings.ColWidthDate  >= MinWidthOf("ColDate");
 
-        if (!allValid) return;   // 하나라도 없거나 비정상 → 전부 기본 비율로 시작
+        if (!allValid) return;   
 
         Cols.SetDrive(_settings.ColWidthDrive);
         Cols.SetName(_settings.ColWidthName);
@@ -1261,20 +1112,14 @@ public partial class MainWindow : Window
         Cols.SetDate(_settings.ColWidthDate);
     }
 
-    // 저장된 창 위치·크기·최대화 상태 복원.
-    // 원칙: 저장값을 그대로 믿지 않고, "현재 연결된 모니터 중 하나에 타이틀바가
-    // 충분히 보이는지" 검증한다. 유효하면 그대로(두 번째 모니터·걸친 배치 존중),
-    // 아니면(모니터 분리·해상도 변경 등) 위치만 버리고 기본(화면 중앙)으로 시작한다.
     private void RestoreWindowPlacement()
     {
         var s = _settings;
-        if (s.WinWidth < 100 || s.WinHeight < 100) return;   // 저장값 없음/비정상 → 기본 크기·중앙
+        if (s.WinWidth < 100 || s.WinHeight < 100) return;
 
-        // 크기는 항상 복원 (최소 크기 미만이면 최소로 보정)
         Width  = Math.Max(MinWidth,  s.WinWidth);
         Height = Math.Max(MinHeight, s.WinHeight);
 
-        // DIP(WPF 단위) → 물리 픽셀 변환 배율 (주 모니터 기준 근사)
         double sx = 1.0, sy = 1.0;
         try
         {
@@ -1287,13 +1132,10 @@ public partial class MainWindow : Window
         }
         catch { }
 
-        // 타이틀바 영역(창 상단 30 DIP)을 픽셀 사각형으로
         var titleRect = new System.Drawing.Rectangle(
             (int)(s.WinLeft * sx), (int)(s.WinTop * sy),
             (int)(Width * sx), (int)(30 * sy));
 
-        // 연결된 모든 모니터의 작업 영역과 교차 검사:
-        // 타이틀바가 가로 50px·세로 10px 이상 보이면 "잡을 수 있는 위치"로 판정
         bool visible = false;
         try
         {
@@ -1311,14 +1153,11 @@ public partial class MainWindow : Window
             Left = s.WinLeft;
             Top  = s.WinTop;
         }
-        // visible == false → 위치는 버리고 XAML의 CenterScreen 유지 (크기만 복원)
 
-        // 최대화는 위치를 정한 뒤에: 창 좌표가 속한 모니터에서 최대화된다
         if (s.WinMaximized)
             WindowState = WindowState.Maximized;
     }
 
-    // 메뉴: 컬럼 너비 초기화 → 디자인 기본값으로 되돌리고 저장
     private void ResetColumnWidths()
     {
         Cols.SetDrive(50);
@@ -1335,7 +1174,6 @@ public partial class MainWindow : Window
         _settings.Save();
     }
 
-    // 헤더 그리드의 인덱스별 실제 렌더 폭 (0=DRV 1=이름 2=경로* 3=크기 4=수정날짜 5=여유)
     private double HeaderActualWidth(int index)
     {
         if (index < HeaderGrid.ColumnDefinitions.Count)
@@ -1343,7 +1181,6 @@ public partial class MainWindow : Window
         return 0;
     }
 
-    // group → Cols의 현재 픽셀값 읽기 / 쓰기
     private double ColPx(string group) => group switch
     {
         "ColDrive" => Cols.DrivePx,
@@ -1364,7 +1201,7 @@ public partial class MainWindow : Window
             case "ColDate":  Cols.SetDate(px);  break;
         }
     }
-    // group → 헤더 인덱스 (실제 렌더 폭 읽기용)
+    
     private static int HeaderIndexOf(string group) => group switch
     {
         "ColDrive" => 0,
@@ -1380,9 +1217,6 @@ public partial class MainWindow : Window
         return i >= 0 ? HeaderActualWidth(i) : ColPx(group);
     }
 
-    // 두 픽셀 컬럼이 경계를 나눠 갖는다: 왼쪽 +delta, 오른쪽 -delta (합 보존).
-    // Cols 한 객체를 두 값 모두 갱신하므로 헤더·모든 행이 동시에 같은 너비가 된다.
-    // 합이 보존되어 경로(*)가 흡수할 변화가 없으므로 수정날짜(마지막 칸)도 잘 줄어든다.
     private void AdjustTwoPixel(string leftGroup, string rightGroup, double delta)
     {
         double lw = ColActual(leftGroup), rw = ColActual(rightGroup);
@@ -1400,18 +1234,13 @@ public partial class MainWindow : Window
         SetCol(rightGroup, rw - delta);
     }
 
-    /// <summary>
-    /// 두 번째 인스턴스가 실행됐을 때 외부(App)에서 호출.
-    /// 숨겨져 있거나 최소화된 창을 다시 보이게 하고 활성화한다.
-    /// </summary>
     public void BringToFront()
     {
-        // UI 스레드에서 실행 보장
         Dispatcher.Invoke(() =>
         {
             if (_trayIcon is not null)
             {
-                _trayIcon.ShowWindow();   // 트레이 헬퍼의 복원+활성화 로직 재사용
+                _trayIcon.ShowWindow();   
             }
             else
             {
@@ -1429,7 +1258,6 @@ public partial class MainWindow : Window
     {
         if (rows.Count == 0) return rows;
 
-        // 숫자/날짜 컬럼은 별도 처리 (문자열 비교 X)
         if (_sortColumn == SortColumn.Size)
         {
             if (rows.Count >= 50_000)
@@ -1452,7 +1280,6 @@ public partial class MainWindow : Window
             return sorted.ToList();
         }
 
-        // 문자열 컬럼
         Func<SearchResultRow, string> keySelector = _sortColumn switch
         {
             SortColumn.Drive => r => r.Drive,
@@ -1485,39 +1312,29 @@ public partial class MainWindow : Window
         }
     }
 
-    // ==================================================
-    //  키보드 단축키 핸들러
-    // ==================================================
-
-    // Ctrl+L — 검색창에 포커스
     private void FocusSearchCommand_Executed(object sender, ExecutedRoutedEventArgs e)
     {
         SearchBox.Focus();
         SearchBox.SelectAll();
     }
 
-    // Esc — 검색창 비우기 + 포커스
     private void ClearAndFocusCommand_Executed(object sender, ExecutedRoutedEventArgs e)
     {
-        // 1단계: 결과 리스트에 선택이 있으면 선택만 해제 (검색어는 유지)
         if (ResultsList.SelectedItems.Count > 0)
         {
             ClearResultSelectionFast();
             return;
         }
 
-        // 2단계: 선택이 없으면 검색어 지우고 검색창으로 포커스
         SearchBox.Clear();
         SearchBox.Focus();
     }
 
-    // Enter (결과 리스트에서) — 열기
     private void OpenCommand_Executed(object sender, ExecutedRoutedEventArgs e)
     {
         OpenSelected();
     }
 
-    // Alt+Enter — 속성
     private void PropertiesCommand_Executed(object sender, ExecutedRoutedEventArgs e)
     {
         var row = GetSelectedRow();
@@ -1526,13 +1343,11 @@ public partial class MainWindow : Window
         catch (Exception ex) { FooterText.Text = $"속성 보기 실패: {ex.Message}"; }
     }
 
-    // Ctrl+C — 파일 복사 (파일 자체를 클립보드에)
     private void CopyFileCommand_Executed(object sender, ExecutedRoutedEventArgs e)
     {
         MenuCopyFile_Click(sender, e);
     }
 
-    // Ctrl+Shift+C — 전체 경로 복사
     private void CopyPathCommand_Executed(object sender, ExecutedRoutedEventArgs e)
     {
         var row = GetSelectedRow();
@@ -1545,10 +1360,8 @@ public partial class MainWindow : Window
         catch { }
     }
 
-    // 검색창에서 ↓ 누르면 결과 리스트로 포커스 이동
     private void SearchBox_KeyDown(object sender, KeyEventArgs e)
     {
-        // Esc 단계 동작: ① 히스토리 팝업 닫기 → ② 검색어 지우기 → ③ 트레이로 숨기기
         if (e.Key == Key.Escape)
         {
             if (HistoryPopup.IsOpen)
@@ -1557,9 +1370,9 @@ public partial class MainWindow : Window
             }
             else if (!string.IsNullOrEmpty(SearchBox.Text))
             {
-                ClearResultSelectionFast();   // 선택이 많으면 먼저 빠르게 해제
+                ClearResultSelectionFast();   
                 SearchBox.Clear();
-                RunSearch();          // 빈 검색 상태로 정리 (목록 비움 + 드라이브 요약)
+                RunSearch();          
             }
             else
             {
@@ -1569,13 +1382,11 @@ public partial class MainWindow : Window
             return;
         }
 
-        // 히스토리 팝업이 열려 있을 때 ↓/↑ 로 항목 "강조"만 이동한다. (실행은 Enter에서)
         if (HistoryPopup.IsOpen && HistoryList.Items.Count > 0 &&
             (e.Key == Key.Down || e.Key == Key.Up))
         {
             if (e.Key == Key.Down)
             {
-                // 처음 ↓ → 맨 위 항목(0번) 강조, 이후 ↓ → 한 칸씩 아래로
                 int next = HistoryList.SelectedIndex < 0
                     ? 0
                     : Math.Min(HistoryList.SelectedIndex + 1, HistoryList.Items.Count - 1);
@@ -1584,11 +1395,10 @@ public partial class MainWindow : Window
                 if (HistoryList.SelectedItem is not null)
                     HistoryList.ScrollIntoView(HistoryList.SelectedItem);
             }
-            else // Key.Up
+            else 
             {
                 if (HistoryList.SelectedIndex <= 0)
                 {
-                    // 맨 위에서 ↑ → 강조 해제 (다시 검색창 입력 상태)
                     _historyKeyboardNav = true;
                     HistoryList.SelectedIndex = -1;
                 }
@@ -1604,10 +1414,8 @@ public partial class MainWindow : Window
             return;
         }
 
-        // Enter: 검색 실행 (히스토리 기록은 RunSearch가 담당)
         if (e.Key == Key.Enter)
         {
-            // 히스토리에서 강조된 항목이 있으면 그 검색어를 검색창에 넣고 실행한다.
             if (HistoryPopup.IsOpen && HistoryList.SelectedItem is HistoryItem highlighted)
             {
                 SearchBox.Text = highlighted.Query;
@@ -1641,32 +1449,37 @@ public partial class MainWindow : Window
         }), System.Windows.Threading.DispatcherPriority.Background);
     }
 
-    // 결과 리스트에서 KeyDown — Ctrl+Shift+N(이름 복사), 첫 행에서 ↑(검색창 복귀)
-    // 빈 공간(항목 없는 영역) 클릭 시 선택 해제 (탐색기와 동일한 동작)
-    private void ResultsList_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        private void ResultsList_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
+        bool bulk = ResultsList.SelectedItems.Count > 2000;
+
         if (IsClickOnEmptySpace(e))
         {
             ClearResultSelectionFast();
             _dragArmed = false;
+
+            if (bulk)
+            {
+                e.Handled = true;
+                return;
+            }
         }
         else
         {
-            // 대량 선택 상태에서 항목을 그냥 클릭하면(수식키 없이) WPF가 수십만 개를
-            // 하나씩 해제하며 UI가 멈춘다. 그 전에 우리가 빠르게 비워둔다.
-            // (Ctrl/Shift 클릭은 기존 선택을 유지·확장하는 동작이므로 건드리지 않는다)
             bool plainClick = (Keyboard.Modifiers & (ModifierKeys.Control | ModifierKeys.Shift)) == 0;
-            if (plainClick && ResultsList.SelectedItems.Count > 2000)
+            if (plainClick && bulk)
+            {
                 ClearResultSelectionFast();
 
-            // 항목 위에서 눌렀으면 드래그 시작 후보로 기록
+                e.Handled = true;
+                return;
+            }
+
             _dragStart = e.GetPosition(null);
             _dragArmed = true;
         }
     }
 
-    // 선택한 파일/폴더를 탐색기 등 외부로 끌어다 놓기 (FileDrop).
-    // 주의: 이 앱은 관리자 권한이라, 일반 권한 탐색기로의 드롭은 Windows(UIPI)가 막을 수 있음.
     private void ResultsList_MouseMove(object sender, System.Windows.Input.MouseEventArgs e)
     {
         if (!_dragArmed || e.LeftButton != MouseButtonState.Pressed) return;
@@ -1674,7 +1487,7 @@ public partial class MainWindow : Window
         var pos = e.GetPosition(null);
         if (Math.Abs(pos.X - _dragStart.X) < SystemParameters.MinimumHorizontalDragDistance &&
             Math.Abs(pos.Y - _dragStart.Y) < SystemParameters.MinimumVerticalDragDistance)
-            return;   // 아직 클릭 수준의 움직임 → 드래그 아님
+            return;  
 
         _dragArmed = false;
 
@@ -1692,29 +1505,21 @@ public partial class MainWindow : Window
             System.Windows.DragDrop.DoDragDrop(ResultsList, data,
                 System.Windows.DragDropEffects.Copy | System.Windows.DragDropEffects.Move);
         }
-        catch { /* 드래그 취소 등은 무시 */ }
+        catch { }
     }
 
-    // 선택 항목 요약: 하단에 "N개 선택, 총 크기"를 표시하고, 해제되면 이전 문구 복원.
     private string? _footerBeforeSelection;
 
-    // 하단 알림 문구(삭제 결과 등)를 자동 재검색이 잠시 덮지 못하게 보호하는 시각
     private DateTime _footerNoticeUntil = DateTime.MinValue;
 
-    /// <summary>하단에 알림 문구를 표시하고 3초간 자동 갱신으로부터 보호한다.</summary>
     private void ShowFooterNotice(string text)
     {
         FooterText.Text = text;
-        _footerBeforeSelection = null;                       // 선택 해제 복원에 덮이지 않게
-        //_footerNoticeUntil = DateTime.UtcNow.AddSeconds(6);  // 자동 재검색 갱신으로부터 보호
-        _footerNoticeUntil = DateTime.MaxValue;  // 사용자가 직접 행동할 때까지 유지
+        _footerBeforeSelection = null;                       
+        //_footerNoticeUntil = DateTime.UtcNow.AddSeconds(6);  
+        _footerNoticeUntil = DateTime.MaxValue;  
     }
 
-    // 대량 선택(Ctrl+A 등) 해제 전용.
-    // WPF의 UnselectAll()은 선택 항목이 수만~수십만 개면 해제 목록을 통째로 만들며
-    // UI가 몇 초간 멈춘다(응답 없음). 그 경우에는 목록을 다시 바인딩해 즉시 해제하고,
-    // 스크롤 위치는 그대로 복원한다. 소량이면 기존 방식 그대로.
-    // 히스토리 팝업의 세로 스크롤바에도 같은 손잡이 계산기를 붙인다 (스타일 통일).
     private bool _historySizerAttached;
 
     private void AttachHistoryScrollBarSizer()
@@ -1732,11 +1537,9 @@ public partial class MainWindow : Window
                 _historySizerAttached = true;
             }
         }
-        catch { /* 실패해도 기본 스크롤 동작에는 영향 없음 */ }
+        catch { }
     }
 
-    // 결과 목록의 세로 스크롤바에 손잡이 크기 계산기를 붙인다.
-    // (템플릿이 적용된 뒤여야 찾을 수 있으므로 Loaded 이후에 호출)
     private void AttachScrollBarSizer()
     {
         try
@@ -1747,7 +1550,7 @@ public partial class MainWindow : Window
             if (sv.Template.FindName("PART_VerticalScrollBar", sv) is System.Windows.Controls.Primitives.ScrollBar vbar)
                 ScrollBarThumbSizer.Attach(vbar, sv);
         }
-        catch { /* 실패해도 기본 스크롤 동작에는 영향 없음 */ }
+        catch { }
     }
 
     private ScrollViewer? GetResultsScrollViewer()
@@ -1761,14 +1564,10 @@ public partial class MainWindow : Window
         catch { return null; }
     }
 
-    /// <summary>
-    /// 결과 목록을 새 목록으로 교체한다.
-    /// 선택이 많은 상태에서 곧바로 다른 목록을 붙이면 WPF가 선택 항목을 하나씩 정리하며
-    /// UI가 멈춘다(수십만 건). 먼저 null로 비워 선택을 통째로 버리고, 그동안 요약 계산도 멈춘다.
-    /// </summary>
     private void SetResultRows(List<SearchResultRow>? rows)
     {
         bool many = ResultsList.SelectedItems.Count > 2000;
+        _lastRows = rows;
 
         _selectionSummaryTimer?.Stop();
         _suppressSelectionSummary = true;
@@ -1785,24 +1584,23 @@ public partial class MainWindow : Window
         UpdateSelectionSummary();
     }
 
-    private void ClearResultSelectionFast()
+        private void ClearResultSelectionFast()
     {
+
+        if (System.Windows.Input.Mouse.Captured is not null)
+            System.Windows.Input.Mouse.Capture(null);
+
         if (ResultsList.SelectedItems.Count == 0) return;
 
-        // 해제 중에는 선택 요약 계산을 멈춘다.
-        // (WPF가 해제 과정에서 SelectionChanged를 여러 번 발생시키는데,
-        //  그때마다 남은 선택을 다시 합산하면 수십만 건에서 사실상 멈춘다)
         int n = ResultsList.SelectedItems.Count;
 
-        _selectionSummaryTimer?.Stop();   // 대기 중인 갱신 취소
+        _selectionSummaryTimer?.Stop();
         _suppressSelectionSummary = true;
+
         try
         {
             if (n > 2000 && ResultsList.ItemsSource is List<SearchResultRow> rows)
             {
-                // 대량 선택: WPF에게 하나씩 해제시키면(UnselectAll·SelectionMode 전환 모두)
-                // 수십만 건에서 UI가 멈춘다. 목록을 다시 붙여 선택을 통째로 버리고
-                // 스크롤 위치만 복원한다.
                 var sv = GetResultsScrollViewer();
                 double offset = sv?.VerticalOffset ?? 0;
 
@@ -1823,21 +1621,41 @@ public partial class MainWindow : Window
             _suppressSelectionSummary = false;
         }
 
-        UpdateSelectionSummary();   // 마지막에 한 번만 갱신
+        UpdateSelectionSummary();
+
+        _runawayCount = 0;
     }
 
     private bool _suppressSelectionSummary;
 
-    // 선택이 아주 많으면 크기 합산을 생략하고 개수만 표시한다.
-    // (수십만 건 합산은 UI를 멈추게 하고, 그 규모에서 총 크기는 실사용 가치가 낮다)
     private const int SelectionSummarySizeLimit = 20_000;
 
-    // Ctrl+A처럼 선택이 한 번에 크게 바뀌면 SelectionChanged가 연달아 올 수 있어,
-    // 짧게 모아서(디바운스) 마지막에 한 번만 계산한다.
     private System.Windows.Threading.DispatcherTimer? _selectionSummaryTimer;
 
     private void ResultsList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        if (e.AddedItems.Count == 1 && e.RemovedItems.Count == 0)
+        {
+            if (_runawayCount == 0) _runawayStart = DateTime.UtcNow;
+            _runawayCount++;
+
+            if (_runawayCount > 60 && (DateTime.UtcNow - _runawayStart).TotalSeconds < 3)
+            {
+                _runawayCount = 0;
+
+                if (System.Windows.Input.Mouse.Captured is not null)
+                    System.Windows.Input.Mouse.Capture(null);
+
+                ResultsList.ItemsSource = null;
+                ResultsList.ItemsSource = _lastRows;
+                return;
+            }
+        }
+        else
+        {
+            _runawayCount = 0;
+        }
+
         if (_suppressSelectionSummary) return;
 
         if (_selectionSummaryTimer is null)
@@ -1857,7 +1675,6 @@ public partial class MainWindow : Window
         _selectionSummaryTimer.Start();
     }
 
-    // 하단 선택 요약("N개 선택, 총 크기") 갱신. 선택이 없으면 이전 문구로 복원.
     private void UpdateSelectionSummary()
     {
         int n = ResultsList.SelectedItems.Count;
@@ -1871,11 +1688,10 @@ public partial class MainWindow : Window
             return;
         }
 
-        _footerBeforeSelection ??= FooterText.Text;   // 처음 선택될 때의 문구를 기억
+        _footerBeforeSelection ??= FooterText.Text;
 
         if (n > SelectionSummarySizeLimit)
         {
-            // 너무 많으면 개수만 (합산 생략)
             FooterText.Text = string.Format(Loc.T("status.selectedMany"), n);
             return;
         }
@@ -1888,10 +1704,8 @@ public partial class MainWindow : Window
             n, HdrTracer.Core.FileInfoFetcher.FormatSize(total));
     }
 
-    // 빈 공간에서 컨텍스트 메뉴 열리는 것을 막는다 (탐색기와 동일한 동작)
     private void ResultsList_ContextMenuOpening(object sender, ContextMenuEventArgs e)
     {
-        // 마우스 위치에서 ListViewItem 찾기 (좌표 기반)
         var pos = Mouse.GetPosition(ResultsList);
         var hit = ResultsList.InputHitTest(pos) as DependencyObject;
         while (hit != null && hit is not ListViewItem)
@@ -1901,18 +1715,16 @@ public partial class MainWindow : Window
         }
         if (hit is not ListViewItem)
         {
-            // 빈 공간 → 메뉴 열기 차단
             e.Handled = true;
         }
     }
 
-    // 마우스 이벤트의 클릭 위치가 항목(ListViewItem)이 아닌 빈 공간인지 판정
     private bool IsClickOnEmptySpace(MouseButtonEventArgs e)
     {
         var dep = e.OriginalSource as DependencyObject;
         while (dep != null && dep is not ListViewItem)
         {
-            if (dep == ResultsList) return true; // ListView 자체까지 도달 = 빈 공간
+            if (dep == ResultsList) return true;
             dep = System.Windows.Media.VisualTreeHelper.GetParent(dep);
         }
         return dep is not ListViewItem;
@@ -1920,9 +1732,6 @@ public partial class MainWindow : Window
 
     private void ResultsList_KeyDown(object sender, KeyEventArgs e)
     {
-        // Esc 단계 동작 (결과 목록): 한 겹만 빠져나온다 —
-        // 선택(강조) 해제 + 검색창으로 포커스 복귀. (하단 선택 요약도 함께 원복됨)
-        // (다음 Esc부터는 검색창 쪽 단계 동작: 검색어 지우기 → 트레이로)
         if (e.Key == Key.Escape)
         {
             ClearResultSelectionFast();
@@ -1931,7 +1740,6 @@ public partial class MainWindow : Window
             return;
         }
 
-        // Del — 휴지통으로 삭제
         if (e.Key == Key.Delete
             && (Keyboard.Modifiers & ModifierKeys.Control) == 0
             && (Keyboard.Modifiers & ModifierKeys.Shift) == 0)
@@ -1944,7 +1752,6 @@ public partial class MainWindow : Window
             return;
         }
 
-        // F2 — 이름 바꾸기 (첫 항목)
         if (e.Key == Key.F2)
         {
             if (ResultsList.SelectedItems.Count > 0)
@@ -1955,7 +1762,6 @@ public partial class MainWindow : Window
             return;
         }
 
-        // Ctrl+Shift+N — 파일 이름 복사
         if (e.Key == Key.N
             && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control
             && (Keyboard.Modifiers & ModifierKeys.Shift) == ModifierKeys.Shift)
@@ -1965,10 +1771,8 @@ public partial class MainWindow : Window
             return;
         }
 
-        // ↑/↓ — 선택 항목을 직접 한 칸씩 이동 (가상화 재활용으로 인한 '맨 위로 점프' 방지)
         if (e.Key == Key.Up || e.Key == Key.Down)
         {
-            // 다중 선택 보조키(Shift/Ctrl)가 눌린 경우는 기본 동작에 맡긴다
             if ((Keyboard.Modifiers & (ModifierKeys.Shift | ModifierKeys.Control)) != 0)
                 return;
 
@@ -1977,7 +1781,6 @@ public partial class MainWindow : Window
 
             int cur = ResultsList.SelectedIndex;
 
-            // 첫 행에서 ↑ → 검색창으로 복귀
             if (e.Key == Key.Up && cur == 0)
             {
                 SearchBox.Focus();
@@ -1989,7 +1792,6 @@ public partial class MainWindow : Window
             int next;
             if (cur < 0)
             {
-                // 선택이 없으면 첫 행(↓) 또는 마지막 행(↑)부터
                 next = (e.Key == Key.Down) ? 0 : count - 1;
             }
             else
@@ -2006,7 +1808,6 @@ public partial class MainWindow : Window
                 if (item != null)
                 {
                     ResultsList.ScrollIntoView(item);
-                    // 컨테이너에 키보드 포커스를 줘서 다음 키 입력도 정확히 이어지게
                     if (ResultsList.ItemContainerGenerator.ContainerFromIndex(next)
                         is System.Windows.Controls.ListViewItem lvi)
                     {
@@ -2019,15 +1820,11 @@ public partial class MainWindow : Window
         }
     }
 
-    // ==================================================
-    //  파일/폴더 동작
-    // ==================================================
     private SearchResultRow? GetSelectedRow()
     {
         return ResultsList.SelectedItem as SearchResultRow;
     }
 
-    /// <summary>현재 선택된 모든 행을 표시 순서대로 반환.</summary>
     private List<SearchResultRow> GetSelectedRows()
     {
         var rows = new List<SearchResultRow>(ResultsList.SelectedItems.Count);
@@ -2048,14 +1845,12 @@ public partial class MainWindow : Window
         var rows = GetSelectedRows();
         if (rows.Count == 0) return;
 
-        // 단일 선택은 OpenSelected (히스토리 기록 포함)로 위임
         if (rows.Count == 1)
         {
             OpenSelected();
             return;
         }
 
-        // 다중 선택: 전부 열기
         int ok = 0, fail = 0;
         foreach (var row in rows)
         {
@@ -2074,7 +1869,6 @@ public partial class MainWindow : Window
             }
         }
 
-        // 검색 히스토리에 기록 (하나라도 성공했을 때)
         if (ok > 0 && !string.IsNullOrWhiteSpace(SearchBox.Text))
             AddToHistory(SearchBox.Text);
 
@@ -2083,7 +1877,6 @@ public partial class MainWindow : Window
             : string.Format(Loc.T("ctx.open.partial"), ok, fail));
     }
 
-    // 실행 가능한 확장자 (관리자 권한 실행 가능 여부 판단용)
     private static readonly HashSet<string> _executableExts = new(StringComparer.OrdinalIgnoreCase)
     {
         ".exe", ".msi", ".bat", ".cmd", ".com", ".ps1"
@@ -2097,7 +1890,6 @@ public partial class MainWindow : Window
         return !string.IsNullOrEmpty(ext) && _executableExts.Contains(ext);
     }
 
-    // 우클릭 메뉴가 열릴 때마다 "관리자 권한으로 실행"의 활성/비활성 토글
     private void ResultsContextMenu_Opened(object sender, RoutedEventArgs e)
     {
         _contextMenuOpen = true;
@@ -2108,12 +1900,10 @@ public partial class MainWindow : Window
     private void ResultsContextMenu_Closed(object sender, RoutedEventArgs e)
     {
         _contextMenuOpen = false;
-        // 메뉴 열린 동안 인덱스 변경 알림이 보류되었을 수 있으므로 디바운스 재가동
         if (!string.IsNullOrEmpty(_lastSearchQuery))
             _indexChangedDebounce.Start();
     }
 
-    // 관리자 권한으로 실행
     private void MenuRunAsAdmin_Click(object sender, RoutedEventArgs e)
     {
         var row = GetSelectedRow();
@@ -2131,7 +1921,7 @@ public partial class MainWindow : Window
             {
                 FileName = row.Path,
                 UseShellExecute = true,
-                Verb = "runas"   // UAC 권한 상승 요청 (이미 관리자면 그대로 시작)
+                Verb = "runas"
             };
             Process.Start(psi);
             FooterText.Text = $"{Loc.T("ctx.runAsAdmin")}: {row.Name}";
@@ -2141,7 +1931,7 @@ public partial class MainWindow : Window
         }
         catch (System.ComponentModel.Win32Exception wex) when (wex.NativeErrorCode == 1223)
         {
-            // 1223 = ERROR_CANCELLED — 사용자가 UAC 대화상자에서 취소
+            
         }
         catch (Exception ex)
         {
@@ -2150,7 +1940,6 @@ public partial class MainWindow : Window
         }
     }
 
-    // 다른 프로그램으로 열기 (Shell API로 직접 호출)
     private void MenuOpenWith_Click(object sender, RoutedEventArgs e)
     {
         var row = GetSelectedRow();
@@ -2164,7 +1953,6 @@ public partial class MainWindow : Window
 
         try
         {
-            // 우리 윈도우 핸들을 부모로 넘겨서 모달 대화상자로 표시
             var helper = new System.Windows.Interop.WindowInteropHelper(this);
             var info = new OPENASINFO
             {
@@ -2173,7 +1961,6 @@ public partial class MainWindow : Window
                 oaifInFlags = OAIF.OAIF_EXEC | OAIF.OAIF_ALLOW_REGISTRATION
             };
             int hr = SHOpenWithDialog(helper.Handle, ref info);
-            // hr가 0이면 성공, 사용자가 취소했어도 보통 성공으로 돌아옴
             if (hr != 0)
             {
                 FooterText.Text = $"{Loc.T("ctx.error")}: HRESULT=0x{hr:X8}";
@@ -2191,7 +1978,6 @@ public partial class MainWindow : Window
         }
     }
 
-    // SHOpenWithDialog P/Invoke
     [Flags]
     private enum OAIF : uint
     {
@@ -2225,11 +2011,10 @@ public partial class MainWindow : Window
             var psi = new ProcessStartInfo
             {
                 FileName = row.Path,
-                UseShellExecute = true   // 연결된 프로그램으로 (폴더면 탐색기로)
+                UseShellExecute = true 
             };
             Process.Start(psi);
 
-            // 결과를 실제로 열었다 → 그 검색은 쓸모 있었으므로 히스토리에 기록
             if (!string.IsNullOrWhiteSpace(SearchBox.Text))
                 AddToHistory(SearchBox.Text);
         }
@@ -2254,7 +2039,6 @@ public partial class MainWindow : Window
         }
     }
 
-    // SHOpenFolderAndSelectItems API
     [DllImport("shell32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern int SHOpenFolderAndSelectItems(
         IntPtr pidlFolder,
@@ -2268,7 +2052,6 @@ public partial class MainWindow : Window
     [DllImport("shell32.dll")]
     private static extern void ILFree(IntPtr pidl);
 
-    // 셸 API 호출 스레드에서 COM을 명시적으로 초기화/해제하기 위한 API
     [DllImport("ole32.dll")]
     private static extern int CoInitializeEx(IntPtr pvReserved, uint dwCoInit);
 
@@ -2277,7 +2060,6 @@ public partial class MainWindow : Window
 
     private static void RevealInExplorer(string path)
     {
-        // 드라이브 루트 등 부모가 없으면 선택 대상이 없으므로 그냥 연다.
         bool isDirectory = Directory.Exists(path);
         if (isDirectory && string.IsNullOrEmpty(Path.GetDirectoryName(path)))
         {
@@ -2285,13 +2067,6 @@ public partial class MainWindow : Window
             return;
         }
 
-        // explorer.exe /select 로 연다.
-        //  - 셸(explorer)이 정상 무결성 수준의 일반 창을 띄우므로, 관리자 권한으로
-        //    실행되는 이 앱에서 호출해도 제목표시줄 버튼(최소화/최대화/닫기)이 없는
-        //    비정상 창이 생기지 않는다. (SHOpenFolderAndSelectItems는 앱의 관리자 COM
-        //    컨텍스트에서 창을 만들어 그 비정상 창이 가끔 생겼다.)
-        //  - /select 인자가 해당 파일/폴더를 폴더 안에서 선택·강조하며, 셸이 창을
-        //    다 띄운 뒤 선택을 적용하므로 강조가 안정적으로 유지된다.
         try
         {
             Process.Start(new ProcessStartInfo
@@ -2303,7 +2078,6 @@ public partial class MainWindow : Window
         }
         catch
         {
-            // 실패 시 부모 폴더만이라도 연다 (선택 강조는 없어도 위치는 보여줌)
             var dir = isDirectory ? path : Path.GetDirectoryName(path);
             if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
                 OpenInExplorer(dir);
@@ -2320,11 +2094,9 @@ public partial class MainWindow : Window
                 UseShellExecute = true
             });
         }
-        catch { /* 실패해도 앱은 계속 */ }
+        catch { }
     }
 
-    // 선택 항목의 폴더를 경로 필터로 검색창에 넣고 재검색.
-    // 파일이면 부모 폴더, 폴더면 그 폴더 자체. 공백 포함 경로는 따옴표로 묶는다.
     private void MenuSearchInFolder_Click(object sender, RoutedEventArgs e)
     {
         var rows = GetSelectedRows();
@@ -2343,7 +2115,6 @@ public partial class MainWindow : Window
         folder = folder.TrimEnd('\\') + "\\";
         string filter = folder.Contains(' ') ? "\"" + folder + "\"" : folder;
 
-        // 기존 검색어에서 이전 경로 필터를 제거하고 새 필터로 교체
         var kept = new List<string>();
         foreach (var t in SplitQueryTokens(SearchBox.Text))
             if (!t.Contains('\\') && !t.Contains('/')) kept.Add(t);
@@ -2353,7 +2124,6 @@ public partial class MainWindow : Window
         RunSearch();
     }
 
-    // 검색창 텍스트를 따옴표 인식하며 토큰으로 분리 (경로 필터 교체용)
     private static List<string> SplitQueryTokens(string raw)
     {
         var tokens = new List<string>();
@@ -2373,7 +2143,6 @@ public partial class MainWindow : Window
         return tokens;
     }
 
-    // 공통: 행 목록을 CSV(UTF-8 BOM, 엑셀 호환)로 저장.
     private void ExportRowsToCsv(IReadOnlyList<SearchResultRow> rows)
     {
         if (rows.Count == 0) return;
@@ -2416,14 +2185,12 @@ public partial class MainWindow : Window
         }
     }
 
-    // 앱 메뉴: 현재 검색 결과 전체 내보내기
     private void ExportAllResults()
     {
         if (ResultsList.ItemsSource is List<SearchResultRow> rows && rows.Count > 0)
             ExportRowsToCsv(rows);
     }
 
-    // 우클릭 메뉴: 선택한 항목만 내보내기
     private void MenuExportSelected_Click(object sender, RoutedEventArgs e)
     {
         var rows = GetSelectedRows();
@@ -2442,7 +2209,7 @@ public partial class MainWindow : Window
                 ? $"경로 복사됨: {rows[0].Path}"
                 : string.Format(Loc.T("ctx.copyPath.multi"), rows.Count);
         }
-        catch { /* 클립보드는 가끔 다른 앱이 잠가서 실패할 수 있음 */ }
+        catch { }
     }
 
     private void MenuCopyName_Click(object sender, RoutedEventArgs e)
@@ -2474,8 +2241,6 @@ public partial class MainWindow : Window
         }
     }
 
-    // ===== 파일 관리: 이름 바꾸기 / 파일 복사 / 휴지통 삭제 =====
-
     private void MenuRename_Click(object sender, RoutedEventArgs e)
     {
         var row = GetSelectedRow();
@@ -2493,7 +2258,6 @@ public partial class MainWindow : Window
             string? dir = System.IO.Path.GetDirectoryName(row.Path);
             if (dir is null) return;
 
-            // 파일은 확장자 보호 (탐색기처럼 이름만 선택), 폴더는 전체 선택
             bool isDir = System.IO.Directory.Exists(row.Path);
             string? newName = PromptForText(
                 Loc.T("ctx.rename.title"),
@@ -2502,7 +2266,6 @@ public partial class MainWindow : Window
                 selectExtension: isDir);
             if (string.IsNullOrWhiteSpace(newName) || newName == oldName) return;
 
-            // 파일인 경우 확장자 변경 여부 확인
             if (!isDir)
             {
                 string oldExt = System.IO.Path.GetExtension(oldName);
@@ -2522,7 +2285,7 @@ public partial class MainWindow : Window
                 System.IO.File.Move(row.Path, newPath);
 
             FooterText.Text = $"{oldName} → {newName}";
-            // 인덱스는 USN 모니터가 자동 반영. 현재 검색은 그대로 두되 결과 갱신.
+            
             if (!string.IsNullOrEmpty(_lastSearchQuery) && SearchBox.Text == _lastSearchQuery)
                 RunSearch();
         }
@@ -2556,7 +2319,6 @@ public partial class MainWindow : Window
                 return;
             }
 
-            // 파일 자체를 클립보드에 (탐색기에 붙여넣기 가능)
             Clipboard.SetFileDropList(paths);
 
             FooterText.Text = paths.Count == 1
@@ -2574,7 +2336,6 @@ public partial class MainWindow : Window
         var rows = GetSelectedRows();
         if (rows.Count == 0) return;
 
-        // 너무 긴 이름/경로는 가운데를 줄여 한 줄로 (다이얼로그 줄바꿈 난립 방지)
         static string Shorten(string s, int max = 60)
             => s.Length <= max ? s : s[..(max / 2 - 1)] + "…" + s[^(max / 2 - 1)..];
 
@@ -2590,7 +2351,6 @@ public partial class MainWindow : Window
         }
         else
         {
-            // 목록은 하나만: 파일명 최대 10개, 위험 항목은 ⚠ 로 표시
             const int previewMax = 10;
             var names = rows.Take(previewMax)
                             .Select(r =>
@@ -2609,95 +2369,33 @@ public partial class MainWindow : Window
                          + "\n\n" + list;
         }
 
-        // 위험 항목이 있으면 경고 문구를 맨 위에 한 줄만 (경로 목록 중복 제거)
         if (dangerous.Count > 0)
             confirmMsg = Loc.T("ctx.delete.danger") + "\n\n" + confirmMsg;
 
         if (!ConfirmDialog.Show(this, Loc.T("ctx.delete.title"), confirmMsg))
             return;
 
-        int ok = 0, fail = 0;
-        string? lastError = null;
+        var report = RobustDelete.Run(this, rows.Select(r => r.Path).ToList(), IsDangerousPath);
 
-        foreach (var row in rows)
-        {
-            try
-            {
-                if (!System.IO.File.Exists(row.Path) && !System.IO.Directory.Exists(row.Path))
-                {
-                    fail++;
-                    lastError = $"{Loc.T("ctx.error")}: {row.Path}";
-                    continue;
-                }
+        ShowFooterNotice(DeleteNotice.Build(report, rows.Count == 1 ? rows[0].Name : null));
 
-                if (System.IO.Directory.Exists(row.Path))
-                {
-                    Microsoft.VisualBasic.FileIO.FileSystem.DeleteDirectory(
-                        row.Path,
-                        Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs,
-                        Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin);
-                }
-                else
-                {
-                    Microsoft.VisualBasic.FileIO.FileSystem.DeleteFile(
-                        row.Path,
-                        Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs,
-                        Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin);
-                }
-                ok++;
-            }
-            catch (Exception ex)
-            {
-                fail++;
-                lastError = ex.Message;
-            }
-        }
+        if (report.FailCount > 0)
+            RobustDelete.ShowFailureReport(this, report);
 
-        // 결과 푸터 표시 (알림 보호: 자동 갱신이 덮지 못하게)
-        if (fail == 0)
+        if (ResultsList.ItemsSource is List<SearchResultRow> shown && report.DeletedPaths.Count > 0)
         {
-            ShowFooterNotice(rows.Count == 1
-                ? $"{Loc.T("ctx.delete.title")}: {rows[0].Name}"
-                : string.Format(Loc.T("ctx.delete.done.multi"), ok));
-        }
-        else
-        {
-            ShowFooterNotice(string.Format(Loc.T("ctx.delete.partial"), ok, fail));
-            if (lastError != null)
-                MessageBox.Show(lastError, Loc.T("ctx.error"), MessageBoxButton.OK, MessageBoxImage.Error);
-        }
-
-        // 방금 휴지통으로 보낸 행은 USN 모니터의 비동기 인덱스 갱신을 기다리지 않고
-        // 화면 목록에서 즉시 제거한다. (삭제 직후엔 인덱스가 아직 갱신 전이라,
-        // 곧바로 RunSearch하면 옛 항목이 다시 나타나는 경합이 있었다.)
-        if (ResultsList.ItemsSource is List<SearchResultRow> shown)
-        {
-            // 인스턴스(참조)가 아니라 경로로 비교한다.
-            // 확인 대화상자 도중 자동 재검색이 결과 목록을 새 인스턴스로 교체했을 수 있어,
-            // 참조 비교로는 제거에 실패해(우클릭 경로) 항목이 늦게 사라지는 문제가 있었다.
-            var deletedPaths = new HashSet<string>(
-                rows.Where(r => !System.IO.File.Exists(r.Path)
-                             && !System.IO.Directory.Exists(r.Path))
-                    .Select(r => r.Path),
-                StringComparer.OrdinalIgnoreCase);
-            if (deletedPaths.Count > 0)
-            {
-                foreach (var p in deletedPaths) _recentlyDeletedPaths.Add(p);
-                var remaining = shown.Where(r => !deletedPaths.Contains(r.Path)).ToList();
-                SetResultRows(remaining);
-            }
+            foreach (var p in report.DeletedPaths) _recentlyDeletedPaths.Add(p);
+            var remaining = shown.Where(r => !report.DeletedPaths.Contains(r.Path)).ToList();
+            SetResultRows(remaining);
         }
     }
 
-    // 시스템에 치명적인 "최상위" 경로인지 판정 (그 안의 개별 파일·폴더는 위험으로 보지 않음).
     private static bool IsDangerousPath(string path)
     {
         if (string.IsNullOrWhiteSpace(path)) return false;
 
-        // 경로 정규화: 뒤쪽 슬래시 제거, 대소문자 무시 비교용
         string p = path.TrimEnd('\\', '/');
 
-        // 드라이브 루트 자체 (예: "C:" 또는 "C:\")
         if (p.Length <= 2 && p.Length >= 1 && p.EndsWith(":")) return true;
         if (p.Length == 2 && char.IsLetter(p[0]) && p[1] == ':') return true;
 
@@ -2708,18 +2406,14 @@ public partial class MainWindow : Window
         string users = Path.Combine(Path.GetPathRoot(win) ?? "C:\\", "Users").TrimEnd('\\');
         string userHome = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile).TrimEnd('\\');
 
-        // Windows / Program Files / ProgramData: 폴더 자체와 그 하위 전체를 위험으로 본다
-        // (ProgramData는 모든 앱의 공유 데이터 + OS 구성 요소(컨테이너 레이어 등)가 있는 곳)
         if (StartsWithDir(p, win) || StartsWithDir(p, pf) || StartsWithDir(p, pf86)
             || StartsWithDir(p, progData)) return true;
 
-        // Users 폴더 자체, 각 사용자 홈 폴더 자체는 위험. 단 그 "안"의 항목은 허용.
         if (p.Equals(users, StringComparison.OrdinalIgnoreCase)) return true;
         if (p.Equals(userHome, StringComparison.OrdinalIgnoreCase)) return true;
 
         return false;
 
-        // p가 baseDir이거나 그 하위인지
         static bool StartsWithDir(string p, string baseDir)
         {
             if (string.IsNullOrEmpty(baseDir)) return false;
@@ -2735,7 +2429,6 @@ public partial class MainWindow : Window
             title, prompt, defaultValue, selectAll: selectExtension);
     }
 
-    // Windows 표준 "속성" 대화상자를 띄우려면 ShellExecuteEx에 "properties" verb를 줘야 함
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     private struct SHELLEXECUTEINFO
     {
@@ -2767,14 +2460,11 @@ public partial class MainWindow : Window
         info.cbSize = Marshal.SizeOf(info);
         info.lpVerb = "properties";
         info.lpFile = path;
-        info.nShow = 1;       // SW_SHOWNORMAL
+        info.nShow = 1;       
         info.fMask = SEE_MASK_INVOKEIDLIST;
         ShellExecuteEx(ref info);
     }
 
-    // ==================================================
-    //  종료 정리
-    // ==================================================
     private void MainWindow_Closed(object? sender, EventArgs e)
     {
         _searchCts?.Cancel();
@@ -2787,10 +2477,8 @@ public partial class MainWindow : Window
             if (slot.Index is null) continue;
             if (!_cacheMeta.TryGetValue(slot.DriveLetter, out var meta)) continue;
 
-            // 저널 ID가 없으면(USB의 일부) 저장해도 catch-up 불가 → 스킵
             if (meta.JournalId == 0) continue;
 
-            // Removable 드라이브는 저장 안 함 (다른 PC/USB에 꽂으면 무효)
             try
             {
                 var driveInfo = new System.IO.DriveInfo(slot.DriveLetter + "\\");
@@ -2829,8 +2517,6 @@ public partial class MainWindow : Window
             return;
         }
 
-        // 진짜 종료 확정: 창 위치·크기·최대화 상태 저장.
-        // (Closed에서는 RestoreBounds가 Empty가 되어 최대화 상태 저장이 안 됨 → 반드시 여기서)
         try
         {
             var b = WindowState == WindowState.Normal
@@ -2843,27 +2529,21 @@ public partial class MainWindow : Window
                 _settings.WinWidth = b.Width;
                 _settings.WinHeight = b.Height;
                 _settings.WinMaximized = WindowState == WindowState.Maximized;
-                _settings.LastSearchQuery = SearchBox.Text;   // 마지막 검색어 (복원 설정이 켜져 있을 때 사용)
+                _settings.LastSearchQuery = SearchBox.Text;
                 _settings.Save();
             }
         }
-        catch { /* 저장 실패해도 종료는 계속 */ }
+        catch { }
     }
 
-    // ==================================================
-    //  타이틀바
-    // ==================================================
     private void MainWindow_StateChanged(object? sender, EventArgs e)
     {
         MaximizeButton.Content = WindowState == WindowState.Maximized ? "\uE923" : "\uE922";
 
         if (WindowState == WindowState.Maximized)
         {
-            // WindowChrome 커스텀 창은 최대화 시 작업표시줄을 침범하고
-            // 화면 밖으로 넘쳐 하단 상태바가 잘린다.
-            // 작업 영역(WorkArea, 작업표시줄 제외)에 맞춰 크기와 위치를 강제한다.
             var wa = SystemParameters.WorkArea;
-            MaxHeight = wa.Height + 2;   // +2: 테두리 보정
+            MaxHeight = wa.Height + 2; 
             MaxWidth  = wa.Width + 2;
         }
         else
@@ -2872,34 +2552,26 @@ public partial class MainWindow : Window
             MaxWidth  = double.PositiveInfinity;
         }
 
-        // 최대화↔복귀로 창 크기가 바뀌면 경로(*) 컬럼이 너비를 재계산하는데,
-        // 가상화 ListView에서는 화면 밖 행이 재활용되며 크기·수정날짜 셀이 빈 채로
-        // 남는다. UpdateLayout만으로는 가상화된 항목이 갱신되지 않으므로,
-        // ItemsPresenter/내부 ItemsHost를 찾아 강제로 다시 측정·정렬시킨다.
         Dispatcher.BeginInvoke(new Action(() =>
         {
             RefreshResultListLayout();
         }), System.Windows.Threading.DispatcherPriority.Render);
     }
 
-    // 가상화 ListView의 모든 (실재) 컨테이너와 내부 패널을 강제로 다시 레이아웃한다.
     private void RefreshResultListLayout()
     {
-        // 가상화 ListView는 창 크기 변경 후 화면 밖 행이 재활용되며 크기·수정날짜 셀이
-        // 빈 채로 남는다(데이터가 많을 때). 가장 확실한 해결은 ItemsSource를 잠깐
-        // 떼었다 같은 리스트로 다시 붙여 모든 컨테이너를 새로 생성하는 것이다.
         var src = ResultsList.ItemsSource;
         if (src is null) return;
 
         double offset = 0;
         var sv = FindVisualChild<System.Windows.Controls.ScrollViewer>(ResultsList);
-        if (sv is not null) offset = sv.VerticalOffset;  // 스크롤 위치 보존
+        if (sv is not null) offset = sv.VerticalOffset; 
 
         ResultsList.ItemsSource = null;
         ResultsList.ItemsSource = src;
         ResultsList.UpdateLayout();
 
-        if (sv is not null) sv.ScrollToVerticalOffset(offset);  // 스크롤 위치 복원
+        if (sv is not null) sv.ScrollToVerticalOffset(offset);
     }
 
     private static T? FindVisualChild<T>(System.Windows.DependencyObject parent) where T : System.Windows.DependencyObject
@@ -2925,7 +2597,6 @@ public partial class MainWindow : Window
             Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom
         };
 
-        // 설정
         var settingsItem = new MenuItem
         {
             Header = Loc.T("menu.settings"),
@@ -2936,7 +2607,6 @@ public partial class MainWindow : Window
 
         menu.Items.Add(new Separator());
 
-        // 인덱스 새로 고침
         var rebuildItem = new MenuItem
         {
             Header = Loc.T("menu.refresh"),
@@ -2945,14 +2615,12 @@ public partial class MainWindow : Window
         rebuildItem.Click += async (_, _) => await RebuildIndex();
         menu.Items.Add(rebuildItem);
 
-        // 컬럼 너비 초기화
         var resetColsItem = new MenuItem { Header = Loc.T("menu.resetCols") };
         resetColsItem.Click += (_, _) => ResetColumnWidths();
         menu.Items.Add(resetColsItem);
 
         menu.Items.Add(new Separator());
 
-        // 배율 (서브메뉴)
         var zoomItem = new MenuItem { Header = Loc.T("menu.zoom") };
 
         var zoomInItem = new MenuItem { Header = Loc.T("menu.zoom.in"), InputGestureText = "Ctrl++" };
@@ -2973,7 +2641,6 @@ public partial class MainWindow : Window
 
         menu.Items.Add(new Separator());
 
-        // 필터링 (서브메뉴)
         var filterItem = new MenuItem { Header = Loc.T("menu.filter") };
 
         void AddFilter(string key, string locKey)
@@ -2991,7 +2658,6 @@ public partial class MainWindow : Window
 
         filterItem.Items.Add(new Separator());
 
-        // 크기 조건 (클릭하면 검색창에 문법이 들어가고 즉시 검색)
         var sizeItem = new MenuItem { Header = Loc.T("filter.size") };
         void AddSize(string locKey, string? token)
         {
@@ -3006,7 +2672,6 @@ public partial class MainWindow : Window
         AddSize("filter.clear", null);
         filterItem.Items.Add(sizeItem);
 
-        // 기간 조건
         var dateItem = new MenuItem { Header = Loc.T("filter.date") };
         void AddDate(string locKey, string? token)
         {
@@ -3022,7 +2687,6 @@ public partial class MainWindow : Window
         AddDate("filter.clear", null);
         filterItem.Items.Add(dateItem);
 
-        // 종류 (폴더만 / 파일만)
         var kindItem = new MenuItem { Header = Loc.T("filter.kind") };
         void AddKind(string locKey, string? token)
         {
@@ -3040,27 +2704,22 @@ public partial class MainWindow : Window
 
         menu.Items.Add(new Separator());
 
-        // 단축키
         var shortcutItem = new MenuItem { Header = Loc.T("menu.shortcuts") };
         shortcutItem.Click += (_, _) => ShowShortcuts();
         menu.Items.Add(shortcutItem);
 
         menu.Items.Add(new Separator());
 
-        // 한영 전환을 위한 서브메뉴
         var langItem = new MenuItem { Header = Loc.T("menu.language") };
 
-        // 지원 언어 전체를 목록으로.
-        // 체크 표시는 MenuItem.IsChecked 대신 헤더 안에 고정폭(18px) 칸으로 직접 그린다
-        // — 다크 테마 메뉴 스타일이 기본 체크 표시를 그리지 않는 경우에도 보이고, 정렬도 맞는다.
         foreach (var lang in Loc.SupportedLanguages)
         {
-            var target = lang;   // 클로저 캡처
+            var target = lang;
 
             var row = new StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal };
             row.Children.Add(new TextBlock
             {
-                Text = Loc.Current == target ? "\u2713" : "",   // ✓
+                Text = Loc.Current == target ? "\u2713" : "",   
                 Width = 18,
                 FontSize = 12,
                 VerticalAlignment = VerticalAlignment.Center
@@ -3080,12 +2739,10 @@ public partial class MainWindow : Window
 
         menu.Items.Add(new Separator());
 
-        // 검색 도움말
         var searchHelpItem = new MenuItem { Header = Loc.T("menu.searchHelp") };
         searchHelpItem.Click += (_, _) => InfoDialog.Show(this, Loc.T("help.search.title"), Loc.T("help.search.body"));
         menu.Items.Add(searchHelpItem);
 
-        // 결과 내보내기 (현재 검색 결과 전체 → CSV)
         var exportItem = new MenuItem
         {
             Header = Loc.T("menu.export"),
@@ -3094,14 +2751,12 @@ public partial class MainWindow : Window
         exportItem.Click += (_, _) => ExportAllResults();
         menu.Items.Add(exportItem);
 
-        // 정보
         var aboutItem = new MenuItem { Header = Loc.T("menu.about") };
         aboutItem.Click += (_, _) => ShowAbout();
         menu.Items.Add(aboutItem);
 
         menu.Items.Add(new Separator());
 
-        // 종료 (앱 완전 종료 — 트레이로 숨기지 않음)
         var exitItem = new MenuItem { Header = Loc.T("tray.exit") };
         exitItem.Click += (_, _) =>
         {
@@ -3121,30 +2776,26 @@ public partial class MainWindow : Window
         _settings.Language = Loc.ToCode(lang);
         _settings.Save();
 
-        // 즉시 반영되는 부분 갱신 (메뉴는 다음에 열 때 자동 반영됨)
         ApplyLocalizedTexts();
     }
 
     private void ApplyLocalizedTexts()
     {
-        // 컬럼 헤더
         HdrDrive.Content = Loc.T("col.drive");
         HdrName.Content  = Loc.T("col.name");
         HdrPath.Content  = Loc.T("col.path");
         HdrSize.Content  = Loc.T("col.size");
         HdrDate.Content  = Loc.T("col.date");
 
-        // 타이틀바 버튼 툴팁
         MenuDropdownButton.ToolTip = Loc.T("tip.menu");
         MinimizeButton.ToolTip     = Loc.T("tip.minimize");
         MaximizeButton.ToolTip     = Loc.T("tip.maximize");
         CloseButton.ToolTip        = Loc.T("tip.close");
         SearchButton.ToolTip       = Loc.T("tip.search");
-        // 히스토리 삭제 버튼(DataTemplate 안)은 동적 리소스로 갱신
+        
         Resources["TipDelete"]     = Loc.T("tip.delete");
         Resources["TipPin"]        = Loc.T("tip.pin");
 
-        // 검색 결과 우클릭 메뉴
         CtxOpen.Header       = Loc.T("ctx.open");
         CtxRunAsAdmin.Header = Loc.T("ctx.runAsAdmin");
         CtxOpenWith.Header   = Loc.T("ctx.openWith");
@@ -3162,7 +2813,6 @@ public partial class MainWindow : Window
         EmptyHintTitle.Text = Loc.T("empty.title");
         EmptyHintBody.Text  = Loc.T("empty.body");
 
-        // 푸터 요약 갱신 (총 N개 등)
         UpdateFooterSummary();
     }
 
@@ -3173,7 +2823,6 @@ public partial class MainWindow : Window
 
         try
         {
-            // ── UI 즉시 반응 ──
             _searchCts?.Cancel();
             SearchBox.Clear();
             SetResultRows(null);
@@ -3181,19 +2830,14 @@ public partial class MainWindow : Window
             StatusBanner.Visibility = Visibility.Visible;
             StatusText.Text = Loc.T("status.indexing");
 
-            // 화면 갱신 보장 (다음 프레임으로 양보)
             await Task.Yield();
 
-            // ── 정리 작업은 백그라운드에서 ──
             await Task.Run(() =>
             {
-                // 메타 사전로딩 중지
                 foreach (var p in _preloaders) p.Stop();
 
-                // 모니터 + 인덱스 정리
                 _multi.DisposeAll();
 
-                // 캐시 파일 삭제
                 var cacheDir = System.IO.Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                     "HdrTracer", "indexes");
@@ -3211,7 +2855,6 @@ public partial class MainWindow : Window
             _preloaders.Clear();
             _cacheMeta.Clear();
 
-            // ── 다시 처음부터 빌드 ──
             var drives = DriveDetector.GetIndexableDrives(_settings.IndexRemovableDrives);
             foreach (var letter in drives)
             {
@@ -3220,20 +2863,18 @@ public partial class MainWindow : Window
             UpdateFooterSummary();
 
             var sw = Stopwatch.StartNew();
-            StartIndexingProgress();   // 1초마다 경과·드라이브별 상태 표시
+            StartIndexingProgress();   
             var tasks = _multi.Slots.Select(slot => Task.Run(() => BuildOneDrive(slot))).ToArray();
             await Task.WhenAll(tasks);
             StopIndexingProgress();
             sw.Stop();
 
-            // ── 모니터 + 사전로딩 다시 시작 ──
             foreach (var slot in _multi.Slots)
             {
                 StartMonitorIfReady(slot);
                 StartMetadataPreloader(slot);
             }
 
-            // 다시 빌드 직후 2초간은 USN/메타 변경에 의한 자동 재검색 억제
             _ignoreIndexChangesUntil = DateTime.UtcNow.AddSeconds(2);
 
             StatusBanner.Visibility = Visibility.Collapsed;
@@ -3264,17 +2905,12 @@ public partial class MainWindow : Window
         dlg.ShowDialog();
     }
 
-    // ==================================================
-    //  설정 창
-    // ==================================================
     private async void SettingsButton_Click(object sender, RoutedEventArgs e)
     {
         var dlg = new SettingsWindow(_settings) { Owner = this };
         var result = dlg.ShowDialog();
         if (result == true)
         {
-            // 숨김+시스템 표시 토글 반영 (엔진에 적용 후 재검색)
-            // 전역 단축키 토글 반영
             if (dlg.HotkeyChanged)
             {
                 if (_settings.GlobalHotkeyEnabled) RegisterGlobalHotkey();
@@ -3304,7 +2940,6 @@ public partial class MainWindow : Window
     {
         if (_settings.IndexRemovableDrives)
         {
-            // 켜졌음 → 현재 꽂힌 USB들 인덱싱
             var indexable = DriveDetector.GetIndexableDrives(includeRemovable: true);
             foreach (var letter in indexable)
             {
@@ -3321,15 +2956,11 @@ public partial class MainWindow : Window
                 UpdateFooterSummary();
             }
 
-            // 검색창에 검색어가 있으면 무조건 목록 갱신.
-            // (_lastSearchQuery 일치 조건은 껐다 켠 직후 상태에 따라 어긋나
-            //  인덱싱은 되는데 목록이 안 바뀌는 문제가 있었음 — USB 도착/제거 경로와 동일한 처방)
             if (!string.IsNullOrEmpty(SearchBox.Text))
                 RunSearch();
         }
         else
         {
-            // 꺼졌음 → 현재 인덱싱된 USB 제거
             var slots = _multi.Slots;
             foreach (var slot in slots)
             {
@@ -3340,9 +2971,6 @@ public partial class MainWindow : Window
             }
             UpdateFooterSummary();
 
-            // 검색창에 검색어가 있으면 무조건 목록 갱신.
-            // (_lastSearchQuery 일치 조건은 껐다 켠 직후 상태에 따라 어긋나
-            //  인덱싱은 되는데 목록이 안 바뀌는 문제가 있었음 — USB 도착/제거 경로와 동일한 처방)
             if (!string.IsNullOrEmpty(SearchBox.Text))
                 RunSearch();
         }
@@ -3423,20 +3051,18 @@ public sealed class SearchResultRow
             if (!_iconResolved)
             {
                 _iconResolved = true;
-                ResolvePath(); // 경로 필요
+                ResolvePath(); 
                 _icon = IconCache.GetIcon(_path!, Kind == "폴더");
             }
             return _icon;
         }
     }
 
-    // 이름만 가볍게 해석 (전체 경로 조립 없이 GetName 사용 → 이름 정렬이 빠름)
     private bool _nameResolved;
     private void ResolveName()
     {
         if (_nameResolved) return;
         _nameResolved = true;
-        // 경로가 이미 만들어졌으면 그걸 쓰고, 아니면 인덱스에서 이름만 직접 가져온다
         _name = _pathResolved ? System.IO.Path.GetFileName(_path) : SourceIndex.GetName(EntryIndex);
     }
 
@@ -3459,9 +3085,6 @@ public sealed class SearchResultRow
             _sizeBytes = SourceIndex.GetSize(EntryIndex);
             _modifiedUtc = SourceIndex.GetModifiedUtc(EntryIndex);
 
-            // 무명 $DATA가 비어 있어(예: WOF 압축 파일, ADS에 실제 데이터가 있는 경우)
-            // 인덱스 크기가 0으로 저장된 파일은, 표시 시점에 디스크에서 실제 크기를 보충한다.
-            // (날짜는 인덱스 값이 정확하므로 그대로 사용)
             if (_sizeBytes == 0 && Kind != "폴더")
             {
                 ResolvePath();
@@ -3489,11 +3112,10 @@ public sealed class SearchResultRow
     }
 }
 
-/// <summary>히스토리 팝업 항목: 고정(📌) 여부를 아는 검색어.</summary>
 public sealed class HistoryItem
 {
     public string Query { get; init; } = "";
     public bool IsPinned { get; init; }
-    public string Display  => (IsPinned ? "\uD83D\uDCCC " : "") + Query;   // 📌 접두
-    public string PinGlyph => IsPinned ? "\uE77A" : "\uE718";              // MDL2: Unpin / Pin
+    public string Display  => (IsPinned ? "\uD83D\uDCCC " : "") + Query;   
+    public string PinGlyph => IsPinned ? "\uE77A" : "\uE718";              
 }

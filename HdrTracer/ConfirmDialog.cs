@@ -2,14 +2,9 @@ using Loc = HdrTracer.Core.Localization;
 
 namespace HdrTracer.App;
 
-/// <summary>
-/// 다이얼로그 공통 색/버튼/창. 메인 윈도우처럼 WindowStyle=None + WindowChrome로
-/// 제목 표시줄을 직접 그려, 타이틀 바 색(#252526)까지 메인 윈도우와 동일하게 맞춘다.
-/// (WPF+WinForms 동시 사용 환경의 타입 모호성을 피하려고 타입을 모두 정규화했다.)
-/// </summary>
 internal static class DialogTheme
 {
-    internal static readonly System.Windows.Media.Brush WindowBg  = Hex("#252526"); // 타이틀 바와 동일
+    internal static readonly System.Windows.Media.Brush WindowBg  = Hex("#252526"); 
     internal static readonly System.Windows.Media.Brush ButtonBg  = Hex("#2D2D30");
     internal static readonly System.Windows.Media.Brush BorderBg  = Hex("#3E3E42");
     internal static readonly System.Windows.Media.Brush HoverBg   = Hex("#3F3F46");
@@ -58,7 +53,6 @@ internal static class DialogTheme
         return tpl;
     }
 
-    /// <summary>다크 톤 버튼(테두리 + 호버/누름 효과).</summary>
     internal static System.Windows.Controls.Button MakeButton(string content)
     {
         var btn = new System.Windows.Controls.Button
@@ -76,7 +70,6 @@ internal static class DialogTheme
         return btn;
     }
 
-    /// <summary>제목 표시줄의 닫기(✕) 버튼.</summary>
     private static System.Windows.Controls.Button MakeCloseButton()
     {
         return new System.Windows.Controls.Button
@@ -92,7 +85,6 @@ internal static class DialogTheme
         };
     }
 
-    /// <summary>WindowStyle=None + WindowChrome로 OS 제목 표시줄 없는 빈 창을 만든다.</summary>
     internal static System.Windows.Window NewWindow(System.Windows.Window? owner)
     {
         var win = new System.Windows.Window
@@ -122,14 +114,12 @@ internal static class DialogTheme
         return win;
     }
 
-    /// <summary>커스텀 제목 표시줄(#252526) + 본문을 조립해 창에 채운다.</summary>
     internal static void Compose(System.Windows.Window win, string title, System.Windows.FrameworkElement body)
     {
         var rootGrid = new System.Windows.Controls.Grid();
         rootGrid.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = new System.Windows.GridLength(34) });
         rootGrid.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = System.Windows.GridLength.Auto });
 
-        // 제목 표시줄 (메인 윈도우와 동일한 #252526)
         var bar = new System.Windows.Controls.Grid { Background = WindowBg };
         bar.ColumnDefinitions.Add(new System.Windows.Controls.ColumnDefinition { Width = new System.Windows.GridLength(1, System.Windows.GridUnitType.Star) });
         bar.ColumnDefinitions.Add(new System.Windows.Controls.ColumnDefinition { Width = System.Windows.GridLength.Auto });
@@ -161,7 +151,6 @@ internal static class DialogTheme
         System.Windows.Controls.Grid.SetRow(body, 1);
         rootGrid.Children.Add(body);
 
-        // 부모(다크)와 구분되도록 가는 외곽선
         var outer = new System.Windows.Controls.Border
         {
             BorderBrush = BorderBg,
@@ -173,7 +162,6 @@ internal static class DialogTheme
     }
 }
 
-/// <summary>버튼 글자까지 앱 언어(한/영)를 따르는 확인 대화상자.</summary>
 internal static class ConfirmDialog
 {
     public static bool Show(System.Windows.Window? owner, string title, string message)
@@ -221,7 +209,6 @@ internal static class ConfirmDialog
     }
 }
 
-/// <summary>한 줄 텍스트 입력 대화상자(이름 바꾸기 등). 동일한 다크 스타일.</summary>
 internal static class InputDialog
 {
     public static string? Show(System.Windows.Window? owner, string title, string prompt, string defaultValue, bool selectAll)
@@ -301,7 +288,6 @@ internal static class InputDialog
     }
 }
 
-/// <summary>확인 버튼 하나짜리 정보 대화상자. "#제목" / "예시|설명" 형식을 2열로 정렬해 그린다.</summary>
 internal static class InfoDialog
 {
     public static void Show(System.Windows.Window? owner, string title, string message)
@@ -317,7 +303,6 @@ internal static class InfoDialog
         var stack = new System.Windows.Controls.StackPanel();
         System.Windows.Controls.Grid.SetRow(stack, 0);
 
-        // 예시|설명 2열 정렬용 공유 그리드
         var table = new System.Windows.Controls.Grid();
         table.ColumnDefinitions.Add(new System.Windows.Controls.ColumnDefinition { Width = System.Windows.GridLength.Auto });
         table.ColumnDefinitions.Add(new System.Windows.Controls.ColumnDefinition { Width = new System.Windows.GridLength(1, System.Windows.GridUnitType.Star) });
@@ -337,14 +322,14 @@ internal static class InfoDialog
         {
             string line = rawLine.TrimEnd('\r');
 
-            if (line.Length == 0)                       // 빈 줄 = 섹션 간격
+            if (line.Length == 0)                       
             {
                 FlushTable();
                 stack.Children.Add(new System.Windows.Controls.Border { Height = 12 });
                 continue;
             }
 
-            if (line.StartsWith("#"))                   // 섹션 제목
+            if (line.StartsWith("#"))                   
             {
                 FlushTable();
                 stack.Children.Add(new System.Windows.Controls.TextBlock
@@ -359,7 +344,7 @@ internal static class InfoDialog
             }
 
             int bar = line.IndexOf('|');
-            if (bar > 0)                                 // 예시 | 설명 (2열)
+            if (bar > 0)                                 
             {
                 table.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = System.Windows.GridLength.Auto });
 
@@ -395,7 +380,6 @@ internal static class InfoDialog
                 continue;
             }
 
-            // 일반 문장
             FlushTable();
             stack.Children.Add(new System.Windows.Controls.TextBlock
             {
