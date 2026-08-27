@@ -30,6 +30,7 @@ public static partial class Localization
         ["tip.menu"]     = "菜单",
         ["tip.minimize"] = "最小化",
         ["tip.maximize"] = "最大化",
+        ["tip.restore"] = "还原",
         ["tip.close"]    = "关闭",
         ["tip.search"]   = "搜索",
         ["tip.delete"]   = "删除",
@@ -170,10 +171,17 @@ public static partial class Localization
             "报告 -临时|名称中包含“临时”的排除\n" +
             "*.txt -*.log|查找 txt 但排除 log\n" +
             "\n" +
+            "#仅在特定文件夹中\n" +
+            "照片 D:\\备份\\|仅在 D:\\备份 下搜索\n" +
+            "照片 \\旅行\\|路径中包含“旅行”文件夹的项目\n" +
+            "照片 \"D:\\我的 文档\\\"|含空格的路径用引号括起来\n" +
+            "\n" +
             "#按名称形状匹配（通配符）\n" +
             "IMG_*_编辑.txt|以 IMG_ 开头、以 _编辑.txt 结尾（含扩展名）\n" +
             "IMG_*_编辑*|不限扩展名时在末尾加 *\n" +
+            "报告*最终.docx|以“报告”开头、以“最终.docx”结尾的形式\n" +
             "照片_?.jpg|? 表示一个字符（照片_1 可以，照片_12 不行）\n" +
+            "项目 folder:|仅查找文件夹（仅文件用 file:）\n" +
             "\n" +
             "#按大小 / 日期筛选\n" +
             "*.mp4 >500MB|大于 500MB 的 mp4（单位必填：KB MB GB TB）\n" +
@@ -181,13 +189,8 @@ public static partial class Localization
             "照片 >2026-01|2026 年 1 月以后修改（年-月-日 顺序）\n" +
             "*.pdf <2024|2024 年之前修改的 pdf\n" +
             "报告 >week|最近 7 天（today · week · month · year）\n" +
-            "项目 folder:|仅查找文件夹（仅文件用 file:）\n" +
             "\n" +
-            "#仅在特定文件夹中\n" +
-            "照片 D:\\备份\\|仅在 D:\\备份 下搜索\n" +
-            "照片 \\旅行\\|路径中包含“旅行”文件夹的项目\n" +
-            "照片 \"D:\\我的 文档\\\"|含空格的路径用引号括起来\n" +
-            "\n" +
+            "使用 * 时，名称整体必须与该形式匹配。\n" +
             "也可以右键点击结果 → “仅在此文件夹中搜索”。\n" +
             "只输入路径不会搜索，请与关键词或扩展名一起使用。",
 
@@ -226,5 +229,7 @@ public static partial class Localization
         ["dn.permMulti"]        = "已永久删除 {0} 个项目。",
         ["dn.mixed"]            = "已删除 {0} 个（其中永久删除 {1} 个）",
         ["dn.permSuffix"]       = "永久删除 {0} 个",
+        ["dn.cancelled"]       = "已取消删除。",
+        ["dn.cancelSuffix"]    = "取消 {0} 个",
     };
 }

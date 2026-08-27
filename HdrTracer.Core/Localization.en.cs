@@ -30,6 +30,7 @@ public static partial class Localization
         ["tip.menu"]     = "Menu",
         ["tip.minimize"] = "Minimize",
         ["tip.maximize"] = "Maximize",
+        ["tip.restore"] = "Restore",
         ["tip.close"]    = "Close",
         ["tip.search"]   = "Search",
         ["tip.delete"]   = "Delete",
@@ -182,7 +183,6 @@ public static partial class Localization
             "IMG_*_edit*|add a trailing * to match any extension\n" +
             "report*final.docx|starts with 'report', ends 'final.docx'\n" +
             "photo_?.jpg|? is a single character (photo_1 yes, photo_12 no)\n" +
-            "With * the whole name must match the shape.\n" +
             "project folder:|folders only (use file: for files only)\n" +
             "\n" +
             "#Filter by size / date\n" +
@@ -192,6 +192,7 @@ public static partial class Localization
             "*.pdf <2024|pdf modified before 2024\n" +
             "report >week|last 7 days (today · week · month · year)\n" +
             "\n" +
+            "With * the whole name must match the shape.\n" +
             "You can also right-click a result → 'Search in this folder'.\n" +
             "A path alone finds nothing — combine it with a word or extension.",
 
@@ -230,5 +231,7 @@ public static partial class Localization
         ["dn.permMulti"]        = "Permanently deleted {0} item(s).",
         ["dn.mixed"]            = "Deleted {0} item(s) ({1} permanently)",
         ["dn.permSuffix"]       = "{0} permanently",
+        ["dn.cancelled"]       = "Delete cancelled.",
+        ["dn.cancelSuffix"]    = "{0} cancelled",
     };
 }

@@ -31,6 +31,7 @@ public static partial class Localization
         ["tip.menu"]     = "메뉴",
         ["tip.minimize"] = "최소화",
         ["tip.maximize"] = "최대화",
+        ["tip.restore"] = "복원",
         ["tip.close"]    = "닫기",
         ["tip.search"]   = "검색",
         ["tip.delete"]   = "삭제",
@@ -182,7 +183,6 @@ public static partial class Localization
             "IMG_*_편집*|확장자를 가리지 않고 찾을 때는 끝에 * 를 붙임\n" +
             "보고서*최종.hwp|'보고서'로 시작해 '최종.hwp'로 끝나는 형식\n" +
             "가을_?.jpg|? 는 글자 하나 (가을_1은 되고 가을_12는 안 됨)\n" +
-            "* 이 있으면 이름 전체가 그 모양과 일치해야 합니다.\n" +
             "프로젝트 folder:|폴더만 찾기 (파일만 찾을 때는 file:)\n" +
             "\n" +
             "#크기·날짜로 거르기\n" +
@@ -192,6 +192,7 @@ public static partial class Localization
             "*.pdf <2024|2024년 이전에 수정된 pdf\n" +
             "보고서 >week|최근 7일 (today · week · month · year)\n" +
             "\n" +
+            "* 이 있으면 이름 전체가 그 모양과 일치해야 합니다.\n" +
             "폴더 검색은 결과를 우클릭해 '이 폴더에서만 검색'을 눌러도 됩니다.\n" +
             "경로만 입력하면 검색되지 않아요. 단어나 확장자와 함께 쓰세요.",
 
@@ -230,5 +231,7 @@ public static partial class Localization
         ["dn.permMulti"]        = "{0}개 항목을 영구 삭제했습니다.",
         ["dn.mixed"]            = "{0}개 삭제 (영구 삭제 {1}개)",
         ["dn.permSuffix"]       = "영구 삭제 {0}개",
+        ["dn.cancelled"]       = "삭제를 취소했습니다.",
+        ["dn.cancelSuffix"]    = "취소 {0}개",
     };
 }

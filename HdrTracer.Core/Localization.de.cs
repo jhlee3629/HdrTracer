@@ -30,6 +30,7 @@ public static partial class Localization
         ["tip.menu"]     = "Menü",
         ["tip.minimize"] = "Minimieren",
         ["tip.maximize"] = "Maximieren",
+        ["tip.restore"] = "Wiederherstellen",
         ["tip.close"]    = "Schließen",
         ["tip.search"]   = "Suchen",
         ["tip.delete"]   = "Löschen",
@@ -170,10 +171,17 @@ public static partial class Localization
             "bericht -entwurf|Namen mit 'entwurf' überspringen\n" +
             "*.txt -*.log|txt suchen, log ausschließen\n" +
             "\n" +
+            "#Nur in einem Ordner\n" +
+            "foto D:\\Sicherung\\|nur unterhalb dieses Ordners suchen\n" +
+            "foto \\Reisen\\|nur Einträge, deren Pfad den Ordner 'Reisen' enthält\n" +
+            "foto \"D:\\Eigene Dateien\\\"|Pfade mit Leerzeichen in \"Anführungszeichen\"\n" +
+            "\n" +
             "#Nach Namensform (Platzhalter)\n" +
             "IMG_*_bearbeitet.txt|beginnt mit IMG_, endet auf _bearbeitet.txt (mit Endung)\n" +
             "IMG_*_bearbeitet*|für beliebige Endung ein * anhängen\n" +
+            "bericht*final.docx|beginnt mit 'bericht', endet auf 'final.docx'\n" +
             "foto_?.jpg|? ist genau ein Zeichen (foto_1 ja, foto_12 nein)\n" +
+            "projekt folder:|nur Ordner (nur Dateien mit file:)\n" +
             "\n" +
             "#Nach Größe oder Datum\n" +
             "*.mp4 >500MB|mp4 größer als 500MB (Einheit nötig: KB MB GB TB)\n" +
@@ -181,13 +189,8 @@ public static partial class Localization
             "foto >2026-01|geändert ab Januar 2026 (Reihenfolge Jahr-Monat-Tag)\n" +
             "*.pdf <2024|pdf, geändert vor 2024\n" +
             "bericht >week|letzte 7 Tage (today · week · month · year)\n" +
-            "projekt folder:|nur Ordner (nur Dateien mit file:)\n" +
             "\n" +
-            "#Nur in einem Ordner\n" +
-            "foto D:\\Sicherung\\|nur unterhalb dieses Ordners suchen\n" +
-            "foto \\Reisen\\|nur Einträge, deren Pfad den Ordner 'Reisen' enthält\n" +
-            "foto \"D:\\Eigene Dateien\\\"|Pfade mit Leerzeichen in \"Anführungszeichen\"\n" +
-            "\n" +
+            "Mit * muss der gesamte Name der Form entsprechen.\n" +
             "Alternativ: Rechtsklick auf ein Ergebnis → 'Nur in diesem Ordner suchen'.\n" +
             "Ein Pfad allein findet nichts — mit Wort oder Endung kombinieren.",
 
@@ -226,5 +229,7 @@ public static partial class Localization
         ["dn.permMulti"]        = "{0} Eintrag/Einträge endgültig gelöscht.",
         ["dn.mixed"]            = "{0} gelöscht ({1} endgültig)",
         ["dn.permSuffix"]       = "{0} endgültig",
+        ["dn.cancelled"]       = "Löschen abgebrochen.",
+        ["dn.cancelSuffix"]    = "{0} abgebrochen",
     };
 }

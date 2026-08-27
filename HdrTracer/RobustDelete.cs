@@ -14,6 +14,7 @@ internal static class RobustDelete
         BadName,      
         NotEmpty,     
         Protected,    
+        Cancelled,   // 사용자가 영구 삭제를 거절함 — 실패가 아님
         Other
     }
 
@@ -39,6 +40,7 @@ internal static class RobustDelete
         public int OkCount { get; set; }
         public int FailCount { get; set; }
         public int PermanentCount { get; set; }
+        public int CancelledCount { get; set; }
     }
 
     public static Report Run(System.Windows.Window owner,
@@ -123,7 +125,17 @@ internal static class RobustDelete
             needPermanent.Add(item);
         }
 
-        if (needPermanent.Count > 0 && AskPermanent(owner, needPermanent.Count))
+        // 영구 삭제 제안을 사용자가 거절한 경우.
+        // 이건 "못 한 것"이 아니라 "하지 않기로 한 것"이므로 실패로 세지 않고,
+        // 실패 보고 창에도 올리지 않는다.
+        if (needPermanent.Count > 0 && !AskPermanent(owner, needPermanent.Count))
+        {
+            foreach (var item in needPermanent)
+                item.Cause = Cause.Cancelled;
+            needPermanent.Clear();
+        }
+
+        if (needPermanent.Count > 0)
         {
             foreach (var item in needPermanent)
             {
@@ -149,6 +161,7 @@ internal static class RobustDelete
         foreach (var it in report.Items)
         {
             if (it.Success) { report.OkCount++; if (it.Permanent) report.PermanentCount++; }
+            else if (it.Cause == Cause.Cancelled) report.CancelledCount++;
             else report.FailCount++;
         }
         return report;
@@ -156,7 +169,8 @@ internal static class RobustDelete
 
     public static void ShowFailureReport(System.Windows.Window owner, Report report)
     {
-        var failed = report.Items.Where(i => !i.Success).ToList();
+        // 취소한 항목은 실패가 아니므로 보고하지 않는다
+        var failed = report.Items.Where(i => !i.Success && i.Cause != Cause.Cancelled).ToList();
         if (failed.Count == 0) return;
 
         var sb = new System.Text.StringBuilder();

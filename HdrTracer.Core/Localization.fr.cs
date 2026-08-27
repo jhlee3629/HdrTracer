@@ -30,6 +30,7 @@ public static partial class Localization
         ["tip.menu"]     = "Menu",
         ["tip.minimize"] = "Réduire",
         ["tip.maximize"] = "Agrandir",
+        ["tip.restore"] = "Restaurer",
         ["tip.close"]    = "Fermer",
         ["tip.search"]   = "Rechercher",
         ["tip.delete"]   = "Supprimer",
@@ -170,10 +171,17 @@ public static partial class Localization
             "rapport -brouillon|ignore les noms contenant 'brouillon'\n" +
             "*.txt -*.log|cherche txt mais pas log\n" +
             "\n" +
+            "#Dans un dossier précis\n" +
+            "photo D:\\Sauvegarde\\|chercher uniquement sous ce dossier\n" +
+            "photo \\Voyages\\|éléments dont le chemin contient le dossier 'Voyages'\n" +
+            "photo \"D:\\Mes documents\\\"|chemins avec espaces entre \"guillemets\"\n" +
+            "\n" +
             "#Par forme du nom (jokers)\n" +
             "IMG_*_retouche.txt|commence par IMG_ et finit par _retouche.txt (extension comprise)\n" +
             "IMG_*_retouche*|ajoutez * à la fin pour n'importe quelle extension\n" +
+            "rapport*final.docx|commence par 'rapport' et finit par 'final.docx'\n" +
             "photo_?.jpg|? correspond à un seul caractère (photo_1 oui, photo_12 non)\n" +
+            "projet folder:|dossiers seulement (file: pour les fichiers)\n" +
             "\n" +
             "#Par taille ou date\n" +
             "*.mp4 >500MB|mp4 de plus de 500MB (unité obligatoire : KB MB GB TB)\n" +
@@ -181,13 +189,8 @@ public static partial class Localization
             "photo >2026-01|modifiés depuis janvier 2026 (ordre année-mois-jour)\n" +
             "*.pdf <2024|pdf modifiés avant 2024\n" +
             "rapport >week|7 derniers jours (today · week · month · year)\n" +
-            "projet folder:|dossiers seulement (file: pour les fichiers)\n" +
             "\n" +
-            "#Dans un dossier précis\n" +
-            "photo D:\\Sauvegarde\\|chercher uniquement sous ce dossier\n" +
-            "photo \\Voyages\\|éléments dont le chemin contient le dossier 'Voyages'\n" +
-            "photo \"D:\\Mes documents\\\"|chemins avec espaces entre \"guillemets\"\n" +
-            "\n" +
+            "Avec *, le nom entier doit correspondre à la forme.\n" +
             "Vous pouvez aussi faire un clic droit sur un résultat → « Rechercher dans ce dossier ».\n" +
             "Un chemin seul ne cherche rien : combinez-le avec un mot ou une extension.",
 
@@ -226,5 +229,7 @@ public static partial class Localization
         ["dn.permMulti"]        = "{0} élément(s) supprimé(s) définitivement.",
         ["dn.mixed"]            = "{0} supprimé(s) (dont {1} définitivement)",
         ["dn.permSuffix"]       = "{0} définitivement",
+        ["dn.cancelled"]       = "Suppression annulée.",
+        ["dn.cancelSuffix"]    = "{0} annulé(s)",
     };
 }

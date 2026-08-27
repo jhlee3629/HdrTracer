@@ -1,5 +1,5 @@
 #define MyAppName "HdrTracer"
-#define MyAppVersion "1.3.0"
+#define MyAppVersion "1.3.1"
 #define MyAppPublisher "HaeDream"
 #define MyAppExeName "HdrTracer.exe"
 

@@ -30,6 +30,7 @@ public static partial class Localization
         ["tip.menu"]     = "Menú",
         ["tip.minimize"] = "Minimizar",
         ["tip.maximize"] = "Maximizar",
+        ["tip.restore"] = "Restaurar",
         ["tip.close"]    = "Cerrar",
         ["tip.search"]   = "Buscar",
         ["tip.delete"]   = "Eliminar",
@@ -170,10 +171,17 @@ public static partial class Localization
             "informe -borrador|omite los nombres que contienen 'borrador'\n" +
             "*.txt -*.log|busca txt pero no log\n" +
             "\n" +
+            "#Solo dentro de una carpeta\n" +
+            "foto D:\\Copias\\|busca solo bajo esa carpeta\n" +
+            "foto \\Viajes\\|solo elementos cuya ruta tiene la carpeta 'Viajes'\n" +
+            "foto \"D:\\Mis documentos\\\"|rutas con espacios entre \"comillas\"\n" +
+            "\n" +
             "#Por forma del nombre (comodines)\n" +
             "IMG_*_editada.txt|empieza por IMG_ y acaba en _editada.txt (con extensión)\n" +
             "IMG_*_editada*|añade * al final para cualquier extensión\n" +
+            "informe*final.docx|empieza por 'informe' y acaba en 'final.docx'\n" +
             "foto_?.jpg|? es un solo carácter (foto_1 sí, foto_12 no)\n" +
+            "proyecto folder:|solo carpetas (usa file: para solo archivos)\n" +
             "\n" +
             "#Por tamaño o fecha\n" +
             "*.mp4 >500MB|mp4 de más de 500MB (unidad obligatoria: KB MB GB TB)\n" +
@@ -181,13 +189,8 @@ public static partial class Localization
             "foto >2026-01|modificados desde enero de 2026 (orden año-mes-día)\n" +
             "*.pdf <2024|pdf modificados antes de 2024\n" +
             "informe >week|últimos 7 días (today · week · month · year)\n" +
-            "proyecto folder:|solo carpetas (usa file: para solo archivos)\n" +
             "\n" +
-            "#Solo dentro de una carpeta\n" +
-            "foto D:\\Copias\\|busca solo bajo esa carpeta\n" +
-            "foto \\Viajes\\|solo elementos cuya ruta tiene la carpeta 'Viajes'\n" +
-            "foto \"D:\\Mis documentos\\\"|rutas con espacios entre \"comillas\"\n" +
-            "\n" +
+            "Con * el nombre completo debe coincidir con la forma.\n" +
             "También puedes hacer clic derecho en un resultado → 'Buscar solo en esta carpeta'.\n" +
             "Una ruta sola no busca nada: combínala con una palabra o una extensión.",
 
@@ -226,5 +229,7 @@ public static partial class Localization
         ["dn.permMulti"]        = "Se eliminaron permanentemente {0} elemento(s).",
         ["dn.mixed"]            = "{0} eliminado(s) ({1} de forma permanente)",
         ["dn.permSuffix"]       = "{0} permanentemente",
+        ["dn.cancelled"]       = "Eliminación cancelada.",
+        ["dn.cancelSuffix"]    = "{0} cancelados",
     };
 }
