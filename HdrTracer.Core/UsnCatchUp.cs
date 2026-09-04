@@ -113,7 +113,8 @@ public static class UsnCatchUp
         }
         else if ((reason & Native.USN_REASON_RENAME_NEW_NAME) != 0)
         {
-            index.RenameByMftRef(rec->FileReferenceNumber, namePtr, nameLen);
+            index.RenameByMftRef(rec->FileReferenceNumber, namePtr, nameLen,
+                                 rec->ParentFileReferenceNumber);
         }
         else if ((reason & Native.USN_REASON_FILE_CREATE) != 0)
         {

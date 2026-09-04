@@ -136,6 +136,7 @@ public sealed class UsnJournalMonitor : IDisposable
     private unsafe bool ProcessRecord(Native.USN_RECORD_V2* rec, byte* recStart)
     {
         uint reason = rec->Reason;
+
         char* namePtr = (char*)(recStart + rec->FileNameOffset);
         int nameLen = rec->FileNameLength / 2;
         bool isDir = (rec->FileAttributes & 0x10) != 0;
@@ -151,15 +152,18 @@ public sealed class UsnJournalMonitor : IDisposable
             }
             else if ((reason & Native.USN_REASON_RENAME_NEW_NAME) != 0)
             {
-                _index.RenameByMftRef(rec->FileReferenceNumber, namePtr, nameLen);
+                _index.RenameByMftRef(rec->FileReferenceNumber, namePtr, nameLen,
+                                      rec->ParentFileReferenceNumber);
                 EntriesRenamed++;
                 changed = true;
             }
             else if ((reason & Native.USN_REASON_FILE_CREATE) != 0)
             {
+                bool isHiddenSystem = (rec->FileAttributes & 0x2) != 0
+                                   && (rec->FileAttributes & 0x4) != 0;
                 _index.AddAndLink(namePtr, nameLen,
                     rec->FileReferenceNumber, rec->ParentFileReferenceNumber,
-                    isDir, 0);
+                    isDir, 0, isHiddenSystem);
                 EntriesAdded++;
                 changed = true;
             }

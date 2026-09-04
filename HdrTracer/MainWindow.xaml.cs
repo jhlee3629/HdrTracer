@@ -99,10 +99,21 @@ public partial class MainWindow : Window
         _indexChangedDebounce.Tick += (_, _) =>
         {
             _indexChangedDebounce.Stop();
-            
+
+            // 검색어가 비어 있으면 하단은 드라이브 총계를 보여주는 상태다.
+            // 재검색은 필요 없지만 파일이 늘거나 줄었으므로 총계는 갱신해야 한다.
+            // (이 분기가 없으면 총계가 검색을 한 번 해야만 바뀐다)
+            if (string.IsNullOrWhiteSpace(SearchBox.Text))
+            {
+                lock (_multi)
+                {
+                    foreach (var ix in _multi.GetActiveIndexes()) ix.PurgeOrphansIfNeeded();
+                }
+                UpdateFooterSummary();
+                return;
+            }
+
             if (string.IsNullOrEmpty(_lastSearchQuery)) return;
-            
-            if (string.IsNullOrWhiteSpace(SearchBox.Text)) return;
             
             if (SearchBox.Text != _lastSearchQuery) return;
             
@@ -607,7 +618,7 @@ public partial class MainWindow : Window
         {
             if (s.Error is not null) return $"{s.DriveLetter} ✕";
             if (s.Index is null) return $"{s.DriveLetter} …";
-            return $"{s.DriveLetter} {s.Index.Count:N0}";
+            return $"{s.DriveLetter} {s.Index.LiveCount:N0}";
         });
 
         var summary = string.Join(" + ", parts);
@@ -833,6 +844,13 @@ public partial class MainWindow : Window
 
         var indexes = _multi.GetActiveIndexes();
 
+        // 폴더가 지워졌는데 그 안의 항목에 삭제 기록이 오지 않아 유령으로 남은 것을 정리한다.
+        // 폴더 삭제가 있었을 때만 실제로 동작하므로 평소 검색에는 비용이 없다.
+        lock (_multi)
+        {
+            foreach (var ix in indexes) ix.PurgeOrphansIfNeeded();
+        }
+
         if (string.IsNullOrWhiteSpace(query) || indexes.Count == 0)
         {
             SetResultRows(null);
@@ -885,7 +903,7 @@ public partial class MainWindow : Window
                 sortedRows = sortedRows.Where(r =>
                 {
                     if (!_recentlyDeletedPaths.Contains(r.Path)) return true;
-                    if (System.IO.File.Exists(r.Path) || System.IO.Directory.Exists(r.Path))
+                    if (RobustDelete.PathExists(r.Path))
                     {
                         _recentlyDeletedPaths.Remove(r.Path);
                         return true;
@@ -1495,7 +1513,7 @@ public partial class MainWindow : Window
         if (rows.Count == 0) return;
 
         var paths = rows.Select(r => r.Path)
-                        .Where(p => System.IO.File.Exists(p) || System.IO.Directory.Exists(p))
+                        .Where(RobustDelete.PathExists)
                         .ToArray();
         if (paths.Length == 0) return;
 
@@ -2248,7 +2266,7 @@ public partial class MainWindow : Window
 
         try
         {
-            if (!System.IO.File.Exists(row.Path) && !System.IO.Directory.Exists(row.Path))
+            if (!RobustDelete.PathExists(row.Path))
             {
                 FooterText.Text = $"{Loc.T("ctx.error")}: {row.Path}";
                 return;
@@ -2307,7 +2325,7 @@ public partial class MainWindow : Window
             int skipped = 0;
             foreach (var row in rows)
             {
-                if (System.IO.File.Exists(row.Path) || System.IO.Directory.Exists(row.Path))
+                if (RobustDelete.PathExists(row.Path))
                     paths.Add(row.Path);
                 else
                     skipped++;

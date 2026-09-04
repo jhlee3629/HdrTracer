@@ -570,6 +570,14 @@ internal static class RobustDelete
 
     private static uint GetAttributes(string path) => GetFileAttributesW(Ext(path));
 
+    /// <summary>
+    /// 경로가 실제로 존재하는지. System.IO의 File.Exists/Directory.Exists와 달리
+    /// 이름 끝에 점·공백이 있거나 260자를 넘는 경로도 정확히 판정한다.
+    /// (Win32 경로 정규화가 끝의 점·공백을 잘라내기 때문에 표준 API는 false를 돌려준다)
+    /// </summary>
+    public static bool PathExists(string path)
+        => !string.IsNullOrEmpty(path) && GetAttributes(path) != INVALID_FILE_ATTRIBUTES;
+
     private static void ClearReadOnly(string path)
     {
         string ext = Ext(path);

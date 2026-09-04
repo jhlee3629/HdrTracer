@@ -21,15 +21,19 @@ public sealed class MultiDriveIndex
         get { lock (_lock) return _slots.ToList(); }
     }
 
-    public int TotalEntryCount
+    /// <summary>
+    /// 살아 있는 항목의 총합. 삭제된 항목은 빠진다.
+    /// (FileIndex.Count는 배열 사용량이라 삭제해도 줄지 않으므로 총계에 쓰면 안 된다)
+    /// </summary>
+    public long TotalEntryCount
     {
         get
         {
-            int sum = 0;
+            long sum = 0;
             lock (_lock)
             {
                 foreach (var s in _slots)
-                    if (s.Index is not null) sum += s.Index.Count;
+                    if (s.Index is not null) sum += s.Index.LiveCount;
             }
             return sum;
         }
