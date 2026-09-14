@@ -460,7 +460,12 @@
                                            StrokeDashArray="1 2" SnapsToDevicePixels="True"/>
                             </ControlTemplate>
                             <ControlTemplate x:Key="HeaderFocusDate">
-                                <Rectangle Margin="1,3,-11.5,3" StrokeThickness="1.5" Stroke="#E8E8EC"
+                                <!-- 오른쪽 여백은 반드시 양수여야 한다.
+                                     음수(예: -11.5)로 두면 스크롤바 자리 컬럼까지 덮으려 하는데,
+                                     그 컬럼 너비는 스크롤바 유무에 따라 11 또는 0으로 바뀐다
+                                     (ResultsList_ScrollChanged). 스크롤바가 없을 때는 자리가 0이라
+                                     사각형만 셀 밖으로 삐져나온다. -->
+                                <Rectangle Margin="1,3,1,3" StrokeThickness="1.5" Stroke="#E8E8EC"
                                            StrokeDashArray="1 2" SnapsToDevicePixels="True"/>
                             </ControlTemplate>
                             <Style x:Key="FocusDrv">
@@ -573,6 +578,11 @@
                             ScrollViewer.ScrollChanged="ResultsList_ScrollChanged">
                         <ListView.Resources>
                             <Style TargetType="ScrollBar" BasedOn="{StaticResource DarkScrollBar}"/>
+                            <!-- 행의 바탕색. 전체 선택이 켜지면 코드에서 이 리소스만 바꾼다.
+                                 트리거·바인딩을 쓰면 컨테이너마다 변경 알림을 구독해야 해서
+                                 스크롤바를 빠르게 끌 때 구독·해지 비용이 커진다. -->
+                            <SolidColorBrush x:Key="RowBaseBrush" Color="Transparent"/>
+                            <SolidColorBrush x:Key="RowHoverBrush" Color="#2D2D30"/>
                         </ListView.Resources>
                         <ListView.InputBindings>
                             <KeyBinding Key="Enter" Command="ApplicationCommands.Open"/>
@@ -589,7 +599,7 @@
                         </ListView.CommandBindings>
                         <ListView.ItemContainerStyle>
                             <Style TargetType="ListViewItem">
-                                <Setter Property="Background" Value="Transparent"/>
+                                <Setter Property="Background" Value="{DynamicResource RowBaseBrush}"/>
                                 <Setter Property="Foreground" Value="#DDDDDD"/>
                                 <Setter Property="Padding" Value="0"/>
                                 <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
@@ -605,7 +615,7 @@
                                             </Border>
                                             <ControlTemplate.Triggers>
                                                 <Trigger Property="IsMouseOver" Value="True">
-                                                    <Setter TargetName="Bd" Property="Background" Value="#2D2D30"/>
+                                                    <Setter TargetName="Bd" Property="Background" Value="{DynamicResource RowHoverBrush}"/>
                                                 </Trigger>
                                                 <Trigger Property="IsSelected" Value="True">
                                                     <Setter TargetName="Bd" Property="Background" Value="#094771"/>

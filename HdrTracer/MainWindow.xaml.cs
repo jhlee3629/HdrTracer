@@ -96,6 +96,16 @@ public partial class MainWindow : Window
         _debounceTimer.Tick += DebounceTimer_Tick;
 
         _indexChangedDebounce = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
+        _footerNoticeTimer.Tick += (_, _) =>
+        {
+            _footerNoticeTimer.Stop();
+            _footerNoticeUntil = DateTime.MinValue;   // 보호 해제
+
+            // 선택이 있으면 선택 요약으로, 없으면 드라이브 총계로 돌아간다
+            if (EffectiveSelectedCount > 0) UpdateSelectionSummary();
+            else                                     UpdateFooterSummary();
+        };
+
         _indexChangedDebounce.Tick += (_, _) =>
         {
             _indexChangedDebounce.Stop();
@@ -116,7 +126,15 @@ public partial class MainWindow : Window
             if (string.IsNullOrEmpty(_lastSearchQuery)) return;
             
             if (SearchBox.Text != _lastSearchQuery) return;
-            
+
+            // 스크롤하는 중에는 재검색을 미룬다. 목록을 통째로 갈아끼우는 작업이라
+            // 스크롤 도중에 끼어들면 손이 걸리는 것처럼 느껴진다.
+            if (Environment.TickCount64 - _lastScrollTicks < 800)
+            {
+                _indexChangedDebounce.Start();
+                return;
+            }
+
             if (_contextMenuOpen)
             {
                 _indexChangedDebounce.Start();
@@ -837,7 +855,11 @@ public partial class MainWindow : Window
     {
         var query = SearchBox.Text;
 
-        if (!isAuto) _footerNoticeUntil = DateTime.MinValue; 
+        if (!isAuto)
+        {
+            _footerNoticeUntil = DateTime.MinValue;
+            IsSelectAllMode = false;
+        }
 
         foreach (var p in _preloaders) p.Pause();
         _preloadResumeTimer.Stop();   
@@ -923,11 +945,27 @@ public partial class MainWindow : Window
 
             if (prevSelectedPaths.Count > 0)
             {
-                ResultsList.SelectedItems.Clear();
-                foreach (var r in sortedRows)
+                _restoringSelection = true;
+                try
                 {
-                    if (prevSelectedPaths.Contains(r.Path))
+                    ResultsList.SelectedItems.Clear();
+
+                    // 찾을 개수를 다 채우면 멈춘다. 이전 선택이 1개인데
+                    // 18만 건을 끝까지 훑으면 그것만으로 300ms가 넘는다.
+                    int want = prevSelectedPaths.Count;
+                    int found = 0;
+
+                    foreach (var r in sortedRows)
+                    {
+                        if (!prevSelectedPaths.Contains(r.Path)) continue;
+
                         ResultsList.SelectedItems.Add(r);
+                        if (++found >= want) break;
+                    }
+                }
+                finally
+                {
+                    _restoringSelection = false;
                 }
             }
 
@@ -1036,8 +1074,12 @@ public partial class MainWindow : Window
         }
     }
 
+    private long _lastScrollTicks;
+
     private void ResultsList_ScrollChanged(object sender, ScrollChangedEventArgs e)
     {
+        _lastScrollTicks = Environment.TickCount64;
+
         if (e.OriginalSource is not ScrollViewer sv) return;
 
         double w = sv.ComputedVerticalScrollBarVisibility == Visibility.Visible ? 11 : 0;
@@ -1338,8 +1380,9 @@ public partial class MainWindow : Window
 
     private void ClearAndFocusCommand_Executed(object sender, ExecutedRoutedEventArgs e)
     {
-        if (ResultsList.SelectedItems.Count > 0)
+        if (EffectiveSelectedCount > 0)
         {
+            ExitSelectAllMode(refreshSummary: false);
             ClearResultSelectionFast();
             return;
         }
@@ -1469,6 +1512,22 @@ public partial class MainWindow : Window
 
         private void ResultsList_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
+        // 스크롤바를 누른 것은 선택을 바꾸려는 조작이 아니다.
+        // IsClickOnEmptySpace가 스크롤바를 "빈 공간"으로 판정해 선택을 지우므로,
+        // 여기서 먼저 걸러내지 않으면 스크롤만 해도 선택이 풀린다(건수와 무관).
+        //
+        // _dragArmed를 반드시 꺼야 한다. 항목을 클릭하면 이 값이 켜진 채로 남는데,
+        // 그 상태로 스크롤바를 끌면 MouseMove가 드래그 앤 드롭을 시작한다.
+        // DoDragDrop은 자체 루프를 도는 모달 동작이라 앱이 멈춘 것처럼 보이고,
+        // 대상 경로를 모으느라 선택 항목 전부의 존재 여부를 디스크에서 확인한다.
+        if (IsClickOnScrollBar(e))
+        {
+            _dragArmed = false;
+            return;
+        }
+
+        ExitSelectAllMode(refreshSummary: false);
+
         bool bulk = ResultsList.SelectedItems.Count > 2000;
 
         if (IsClickOnEmptySpace(e))
@@ -1498,8 +1557,27 @@ public partial class MainWindow : Window
         }
     }
 
+    private static void SetPreferredDropEffectCopy(System.Windows.DataObject data)
+    {
+        try
+        {
+            var ms = new System.IO.MemoryStream(4);
+            ms.Write(BitConverter.GetBytes(5), 0, 4);
+            ms.Position = 0;
+            data.SetData("Preferred DropEffect", ms);
+        }
+        catch { }
+    }
+
     private void ResultsList_MouseMove(object sender, System.Windows.Input.MouseEventArgs e)
     {
+        // 스크롤바 위에서는 드래그를 시작하지 않는다 (이중 안전장치)
+        if (IsOverScrollBar(e.OriginalSource as DependencyObject))
+        {
+            _dragArmed = false;
+            return;
+        }
+
         if (!_dragArmed || e.LeftButton != MouseButtonState.Pressed) return;
 
         var pos = e.GetPosition(null);
@@ -1518,8 +1596,12 @@ public partial class MainWindow : Window
         if (paths.Length == 0) return;
 
         var data = new System.Windows.DataObject(System.Windows.DataFormats.FileDrop, paths);
+        SetPreferredDropEffectCopy(data);
+
         try
         {
+            // 허용 효과에서 Move를 빼면 탐색기가 드롭 자체를 거부한다.
+            // 둘 다 허용하되, 위의 Preferred DropEffect로 복사를 선호한다고 알린다.
             System.Windows.DragDrop.DoDragDrop(ResultsList, data,
                 System.Windows.DragDropEffects.Copy | System.Windows.DragDropEffects.Move);
         }
@@ -1530,12 +1612,60 @@ public partial class MainWindow : Window
 
     private DateTime _footerNoticeUntil = DateTime.MinValue;
 
+    private const int SelectAllThreshold = 2000;
+
+    public static readonly DependencyProperty IsSelectAllModeProperty =
+        DependencyProperty.Register(nameof(IsSelectAllMode), typeof(bool), typeof(MainWindow),
+            new PropertyMetadata(false,
+                (d, e) => ((MainWindow)d).ApplySelectAllHighlight((bool)e.NewValue)));
+
+    private static readonly System.Windows.Media.SolidColorBrush SelectAllBrush = MakeFrozen(0x09, 0x47, 0x71);
+    private static readonly System.Windows.Media.SolidColorBrush RowNormalBrush = MakeFrozen(0, 0, 0, 0);
+    private static readonly System.Windows.Media.SolidColorBrush RowHoverBrush = MakeFrozen(0x2D, 0x2D, 0x30);
+
+    private static System.Windows.Media.SolidColorBrush MakeFrozen(byte r, byte g, byte b, byte a = 255)
+    {
+        var br = new System.Windows.Media.SolidColorBrush(
+            System.Windows.Media.Color.FromArgb(a, r, g, b));
+        br.Freeze();
+        return br;
+    }
+
+    private void ApplySelectAllHighlight(bool on)
+    {
+        if (ResultsList is null) return;
+
+        ResultsList.Resources["RowBaseBrush"] = on ? SelectAllBrush : RowNormalBrush;
+
+        // 전체 선택 중에는 마우스를 올려도 색이 바뀌지 않게 한다.
+        // 그 행만 회색으로 변하면 거기만 선택이 풀린 것처럼 보인다.
+        ResultsList.Resources["RowHoverBrush"] = on ? SelectAllBrush : RowHoverBrush;
+    }
+
+    public bool IsSelectAllMode
+    {
+        get => (bool)GetValue(IsSelectAllModeProperty);
+        set => SetValue(IsSelectAllModeProperty, value);
+    }
+
+    private const double FooterNoticeSeconds = 8;
+
+    private readonly System.Windows.Threading.DispatcherTimer _footerNoticeTimer = new();
+
     private void ShowFooterNotice(string text)
     {
         FooterText.Text = text;
-        _footerBeforeSelection = null;                       
-        //_footerNoticeUntil = DateTime.UtcNow.AddSeconds(6);  
-        _footerNoticeUntil = DateTime.MaxValue;  
+        _footerBeforeSelection = null;
+
+        // 알림을 보호할 시간. 이 동안에는 선택 요약도 총계도 덮어쓰지 못한다.
+        // 무기한(MaxValue)으로 두면 알림이 영원히 남아 총계 표시로 돌아오지 못한다.
+        _footerNoticeUntil = DateTime.UtcNow.AddSeconds(FooterNoticeSeconds);
+
+        // 보호가 끝나면 스스로 원래 표시로 돌아간다.
+        // (그때까지 아무 조작이 없으면 알림이 계속 남아 있게 되므로)
+        _footerNoticeTimer.Stop();
+        _footerNoticeTimer.Interval = TimeSpan.FromSeconds(FooterNoticeSeconds + 0.2);
+        _footerNoticeTimer.Start();
     }
 
     private bool _historySizerAttached;
@@ -1585,6 +1715,12 @@ public partial class MainWindow : Window
     private void SetResultRows(List<SearchResultRow>? rows)
     {
         bool many = ResultsList.SelectedItems.Count > 2000;
+
+        // 목록이 비면 전체 선택도 의미가 없다. 반대로 내용이 바뀌었을 뿐이면
+        // (자동 재검색·정렬) 전체 선택은 그대로 둔다. 여기서 풀면
+        // 배경에서 파일이 바뀔 때마다 사용자의 전체 선택이 저절로 사라진다.
+        if (rows is null || rows.Count == 0) IsSelectAllMode = false;
+
         _lastRows = rows;
 
         _selectionSummaryTimer?.Stop();
@@ -1646,12 +1782,18 @@ public partial class MainWindow : Window
 
     private bool _suppressSelectionSummary;
 
+    private bool _restoringSelection;
+
     private const int SelectionSummarySizeLimit = 20_000;
 
     private System.Windows.Threading.DispatcherTimer? _selectionSummaryTimer;
 
     private void ResultsList_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
+        // 우리가 선택을 복원하는 중이면 한 개씩 늘어나는 것이 정상이다.
+        // 이것을 폭주로 오인해 끊으면 사용자의 선택이 통째로 사라진다.
+        if (_restoringSelection) return;
+
         if (e.AddedItems.Count == 1 && e.RemovedItems.Count == 0)
         {
             if (_runawayCount == 0) _runawayStart = DateTime.UtcNow;
@@ -1695,7 +1837,12 @@ public partial class MainWindow : Window
 
     private void UpdateSelectionSummary()
     {
-        int n = ResultsList.SelectedItems.Count;
+        // 알림(삭제 결과 등)이 떠 있는 동안에는 덮어쓰지 않는다.
+        // 삭제 직후 목록이 갈아끼워지면서 SelectionChanged가 곧바로 발생하는데,
+        // 여기서 선택 요약을 쓰면 알림이 눈에 보이기도 전에 사라진다.
+        if (DateTime.UtcNow < _footerNoticeUntil) return;
+
+        int n = EffectiveSelectedCount;
         if (n == 0)
         {
             if (_footerBeforeSelection != null)
@@ -1708,6 +1855,10 @@ public partial class MainWindow : Window
 
         _footerBeforeSelection ??= FooterText.Text;
 
+        // 크기 합계는 항목 수가 많으면 생략한다.
+        // SizeBytes는 아직 크기를 읽지 않은 행에서 파일 정보를 가져오므로,
+        // 18만 건을 더하면 한 번에 800ms가 넘고 힙이 50MB씩 늘어난다.
+        // 요약이 반복 호출되면 그 할당이 쌓여 Gen2 수집을 부르고 UI가 수 초간 멈춘다.
         if (n > SelectionSummarySizeLimit)
         {
             FooterText.Text = string.Format(Loc.T("status.selectedMany"), n);
@@ -1715,8 +1866,18 @@ public partial class MainWindow : Window
         }
 
         long total = 0;
-        foreach (var it in ResultsList.SelectedItems)
-            if (it is SearchResultRow r) total += r.SizeBytes;
+
+        // 전체 선택 모드에서는 SelectedItems가 비어 있다. 그것을 훑으면 합계가 0이 되어
+        // 각 행에는 크기가 보이는데 합계만 0 B로 나오는 모순이 생긴다.
+        if (IsSelectAllMode && _lastRows is not null)
+        {
+            foreach (var r in _lastRows) total += r.SizeBytes;
+        }
+        else
+        {
+            foreach (var it in ResultsList.SelectedItems)
+                if (it is SearchResultRow r) total += r.SizeBytes;
+        }
 
         FooterText.Text = string.Format(Loc.T("status.selected"),
             n, HdrTracer.Core.FileInfoFetcher.FormatSize(total));
@@ -1737,6 +1898,19 @@ public partial class MainWindow : Window
         }
     }
 
+    private static bool IsClickOnScrollBar(MouseButtonEventArgs e)
+        => IsOverScrollBar(e.OriginalSource as DependencyObject);
+
+    private static bool IsOverScrollBar(DependencyObject? dep)
+    {
+        for (int guard = 0; dep is not null && guard < 100; guard++)
+        {
+            if (dep is System.Windows.Controls.Primitives.ScrollBar) return true;
+            dep = System.Windows.Media.VisualTreeHelper.GetParent(dep);
+        }
+        return false;
+    }
+
     private bool IsClickOnEmptySpace(MouseButtonEventArgs e)
     {
         var dep = e.OriginalSource as DependencyObject;
@@ -1750,8 +1924,19 @@ public partial class MainWindow : Window
 
     private void ResultsList_KeyDown(object sender, KeyEventArgs e)
     {
+        if (e.Key == Key.A && (Keyboard.Modifiers & ModifierKeys.Control) != 0)
+        {
+            if (_lastRows is not null && _lastRows.Count > SelectAllThreshold)
+            {
+                EnterSelectAllMode();
+                e.Handled = true;
+                return;
+            }
+        }
+
         if (e.Key == Key.Escape)
         {
+            ExitSelectAllMode(refreshSummary: false);
             ClearResultSelectionFast();
             SearchBox.Focus();
             e.Handled = true;
@@ -1838,13 +2023,34 @@ public partial class MainWindow : Window
         }
     }
 
+    private int EffectiveSelectedCount =>
+        IsSelectAllMode ? (_lastRows?.Count ?? 0) : ResultsList.SelectedItems.Count;
+
+    private void EnterSelectAllMode()
+    {
+        if (ResultsList.SelectedItems.Count > 0) ClearResultSelectionFast();
+        IsSelectAllMode = true;
+        UpdateSelectionSummary();
+    }
+
+    private void ExitSelectAllMode(bool refreshSummary = true)
+    {
+        if (!IsSelectAllMode) return;
+        IsSelectAllMode = false;
+        if (refreshSummary) UpdateSelectionSummary();
+    }
+
     private SearchResultRow? GetSelectedRow()
     {
+        if (IsSelectAllMode && _lastRows is { Count: > 0 }) return _lastRows[0];
         return ResultsList.SelectedItem as SearchResultRow;
     }
 
     private List<SearchResultRow> GetSelectedRows()
     {
+        if (IsSelectAllMode && _lastRows is not null)
+            return new List<SearchResultRow>(_lastRows);
+
         var rows = new List<SearchResultRow>(ResultsList.SelectedItems.Count);
         foreach (var item in ResultsList.SelectedItems)
         {
@@ -1855,6 +2061,14 @@ public partial class MainWindow : Window
 
     private void ResultsList_MouseDoubleClick(object sender, MouseButtonEventArgs e)
     {
+        // 스크롤바 화살표를 연달아 누르면 더블클릭으로 인식되어 파일이 열린다.
+        if (IsClickOnScrollBar(e)) return;
+
+        // Shift·Ctrl을 누른 채로 하는 클릭은 선택 범위를 넓히려는 것이지 열려는 것이 아니다.
+        // 같은 자리 근처를 짧은 간격으로 두 번 누르면 Windows가 더블클릭으로 세므로,
+        // 선택을 조정하다 의도치 않게 파일이 열린다.
+        if ((Keyboard.Modifiers & (ModifierKeys.Shift | ModifierKeys.Control)) != 0) return;
+
         OpenSelected();
     }
 

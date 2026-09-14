@@ -25,7 +25,7 @@ A fast file search tool for Windows that finds files on NTFS drives by name.
 - Results refresh automatically when a USB drive is plugged in or removed
 - Pinned searches — pin frequent queries (📌) and run them instantly with `Ctrl+1~9`
 - Work with results — right-click (open / show in folder / search in this folder / copy path / delete),
-  drag & drop into File Explorer, export to CSV, selection count & total size in the status bar
+  drag & drop into File Explorer (copy, move), export to CSV, selection count & total size in the status bar
 - Delete stubborn items — files and folders Explorer cannot handle (names ending with a space or a dot, paths over 260 characters) can be deleted directly. When a delete fails, the reason is shown along with the program holding the file
 - Excluded folders — hide system-ish folders like WinSxS or node_modules from results
 - Remembers your window size & position, column widths, and sort order
@@ -82,6 +82,15 @@ Full details: app menu (HdrTracer ▼) → Search help.
 Click the search box to see recent searches. Pin one with the 📌 button to keep it at the
 top of the list, and run pinned searches instantly with `Ctrl+1~9` (top to bottom).
 
+### Dragging results into File Explorer
+
+Drag selected results into a File Explorer window or onto the desktop to **copy** them.
+The originals stay where they are, even when the destination is on the same drive.
+
+One thing to watch: **dragging while holding Shift performs a plain move**.
+After picking items with Shift, let go of the key and then drag — that copies.
+Holding Ctrl to pick items, or clicking a single item, is not affected.
+
 ### Deleting files
 
 Right-click a result → **Move to Recycle Bin**. Normal files go to the Recycle Bin and can be
@@ -125,6 +134,8 @@ settings to include them.
 
 - NTFS only. Other file systems are not indexed.
 - No file content search. Only names and paths are searched.
+- Dragging results into File Explorer copies them. Holding Shift while dropping moves them
+  instead — that is a Windows rule the app cannot override.
 - SmartScreen warning appears because the build is not code-signed.
 - Deletion moves items to the Recycle Bin by default. Items that cannot be sent there are
   permanently deleted only after a separate confirmation. If system-critical paths are

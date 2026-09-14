@@ -59,7 +59,6 @@ public partial class SettingsWindow : Window
     {
         Title          = Loc.T("settings.title");
         TitleText.Text = Loc.T("settings.title");
-        SecIndexing.Text = Loc.T("settings.indexing");
         UsbTitle.Text  = Loc.T("settings.usb");
         UsbDesc.Text   = Loc.T("settings.usb.desc");
         TrayTitle.Text = Loc.T("settings.tray");

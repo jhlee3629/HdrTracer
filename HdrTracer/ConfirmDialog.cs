@@ -21,6 +21,30 @@ internal static class DialogTheme
         return b;
     }
 
+    private static System.Windows.Style? _focusVisual;
+
+    internal static System.Windows.Style FocusVisual()
+    {
+        if (_focusVisual is not null) return _focusVisual;
+
+        var rect = new System.Windows.FrameworkElementFactory(typeof(System.Windows.Shapes.Rectangle));
+        rect.SetValue(System.Windows.Shapes.Shape.StrokeProperty, Hex("#E8E8EC"));
+        rect.SetValue(System.Windows.Shapes.Shape.StrokeThicknessProperty, 1.0);
+        rect.SetValue(System.Windows.Shapes.Shape.StrokeDashArrayProperty,
+            new System.Windows.Media.DoubleCollection { 2, 2 });
+        rect.SetValue(System.Windows.FrameworkElement.MarginProperty, new System.Windows.Thickness(2));
+        rect.SetValue(System.Windows.UIElement.SnapsToDevicePixelsProperty, true);
+
+        var tpl = new System.Windows.Controls.ControlTemplate { VisualTree = rect };
+        var st = new System.Windows.Style();
+        st.Setters.Add(new System.Windows.Setter(
+            System.Windows.Controls.Control.TemplateProperty, tpl));
+        st.Seal();
+
+        _focusVisual = st;
+        return st;
+    }
+
     private static System.Windows.Controls.ControlTemplate ButtonTemplate(
         System.Windows.Media.Brush normal, System.Windows.Media.Brush hover,
         System.Windows.Media.Brush pressed, System.Windows.Media.Brush? border, double corner)
@@ -64,7 +88,7 @@ internal static class DialogTheme
             FontSize = 13,
             Cursor = System.Windows.Input.Cursors.Arrow,
             SnapsToDevicePixels = true,
-            FocusVisualStyle = null,
+            FocusVisualStyle = FocusVisual(),
             Template = ButtonTemplate(ButtonBg, HoverBg, PressedBg, BorderBg, 3)
         };
         return btn;
@@ -80,7 +104,7 @@ internal static class DialogTheme
             Foreground = TextFg,
             FontSize = 12,
             Cursor = System.Windows.Input.Cursors.Arrow,
-            FocusVisualStyle = null,
+            FocusVisualStyle = FocusVisual(),
             Template = ButtonTemplate(System.Windows.Media.Brushes.Transparent, CloseHover, CloseHover, null, 0)
         };
     }
@@ -203,6 +227,8 @@ internal static class ConfirmDialog
         btnRow.Children.Add(okBtn);
         btnRow.Children.Add(cancelBtn);
         body.Children.Add(btnRow);
+
+        win.Loaded += (_, _) => okBtn.Focus();
 
         DialogTheme.Compose(win, title, body);
         return win.ShowDialog() == true;
@@ -401,6 +427,8 @@ internal static class InfoDialog
         okBtn.Click += (_, _) => win.DialogResult = true;
         System.Windows.Controls.Grid.SetRow(okBtn, 2);
         body.Children.Add(okBtn);
+
+        win.Loaded += (_, _) => okBtn.Focus();
 
         DialogTheme.Compose(win, title, body);
         win.ShowDialog();
