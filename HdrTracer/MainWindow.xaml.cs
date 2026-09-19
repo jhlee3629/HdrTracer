@@ -1401,7 +1401,7 @@ public partial class MainWindow : Window
         var row = GetSelectedRow();
         if (row is null) return;
         try { ShowFileProperties(row.Path); }
-        catch (Exception ex) { FooterText.Text = $"속성 보기 실패: {ex.Message}"; }
+        catch (Exception ex) { ShowFooterNotice($"속성 보기 실패: {ex.Message}"); }
     }
 
     private void CopyFileCommand_Executed(object sender, ExecutedRoutedEventArgs e)
@@ -1416,7 +1416,7 @@ public partial class MainWindow : Window
         try
         {
             Clipboard.SetText(row.Path);
-            FooterText.Text = $"경로 복사됨: {row.Path}";
+            ShowFooterNotice($"경로 복사됨: {row.Path}");
         }
         catch { }
     }
@@ -1535,6 +1535,8 @@ public partial class MainWindow : Window
             ClearResultSelectionFast();
             _dragArmed = false;
 
+            if (!ResultsList.IsKeyboardFocusWithin) ResultsList.Focus();
+
             if (bulk)
             {
                 e.Handled = true;
@@ -1557,6 +1559,11 @@ public partial class MainWindow : Window
         }
     }
 
+    /// <summary>
+    /// 끌어 놓기의 기본 동작을 복사로 알린다.
+    /// 이 값이 없으면 Windows 규칙대로 같은 드라이브 안에서는 이동이 되어 원본이 사라진다.
+    /// 값 5 = DROPEFFECT_COPY.
+    /// </summary>
     private static void SetPreferredDropEffectCopy(System.Windows.DataObject data)
     {
         try
@@ -1631,6 +1638,10 @@ public partial class MainWindow : Window
         return br;
     }
 
+    /// <summary>
+    /// 전체 선택 강조. 행마다 트리거를 걸지 않고 리소스 하나만 바꾼다.
+    /// 컨테이너마다 변경 알림을 구독하면 스크롤바를 빠르게 끌 때 구독·해지 비용이 커진다.
+    /// </summary>
     private void ApplySelectAllHighlight(bool on)
     {
         if (ResultsList is null) return;
@@ -1648,8 +1659,10 @@ public partial class MainWindow : Window
         set => SetValue(IsSelectAllModeProperty, value);
     }
 
+    /// <summary>하단 알림을 유지할 시간(초). 이 동안 선택 요약·총계가 덮어쓰지 못한다.</summary>
     private const double FooterNoticeSeconds = 8;
 
+    /// <summary>알림 보호가 끝나면 원래 표시(총계 또는 선택 요약)로 되돌리는 타이머.</summary>
     private readonly System.Windows.Threading.DispatcherTimer _footerNoticeTimer = new();
 
     private void ShowFooterNotice(string text)
@@ -2143,7 +2156,7 @@ public partial class MainWindow : Window
 
         if (!IsExecutablePath(row.Path))
         {
-            FooterText.Text = $"{Loc.T("ctx.error")}: {Loc.T("ctx.notExecutable")}";
+            ShowFooterNotice($"{Loc.T("ctx.error")}: {Loc.T("ctx.notExecutable")}");
             return;
         }
 
@@ -2156,7 +2169,7 @@ public partial class MainWindow : Window
                 Verb = "runas"
             };
             Process.Start(psi);
-            FooterText.Text = $"{Loc.T("ctx.runAsAdmin")}: {row.Name}";
+            ShowFooterNotice($"{Loc.T("ctx.runAsAdmin")}: {row.Name}");
 
             if (!string.IsNullOrWhiteSpace(SearchBox.Text))
                 AddToHistory(SearchBox.Text);
@@ -2179,7 +2192,7 @@ public partial class MainWindow : Window
 
         if (!System.IO.File.Exists(row.Path))
         {
-            FooterText.Text = $"{Loc.T("ctx.error")}: {row.Path}";
+            ShowFooterNotice($"{Loc.T("ctx.error")}: {row.Path}");
             return;
         }
 
@@ -2195,7 +2208,7 @@ public partial class MainWindow : Window
             int hr = SHOpenWithDialog(helper.Handle, ref info);
             if (hr != 0)
             {
-                FooterText.Text = $"{Loc.T("ctx.error")}: HRESULT=0x{hr:X8}";
+                ShowFooterNotice($"{Loc.T("ctx.error")}: HRESULT=0x{hr:X8}");
             }
             else
             {
@@ -2252,7 +2265,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            FooterText.Text = $"열기 실패: {ex.Message}";
+            ShowFooterNotice($"열기 실패: {ex.Message}");
         }
     }
 
@@ -2267,7 +2280,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            FooterText.Text = $"폴더에서 보기 실패: {ex.Message}";
+            ShowFooterNotice($"폴더에서 보기 실패: {ex.Message}");
         }
     }
 
@@ -2409,7 +2422,7 @@ public partial class MainWindow : Window
             }
 
             System.IO.File.WriteAllText(dlg.FileName, sb.ToString(), new System.Text.UTF8Encoding(true));
-            FooterText.Text = string.Format(Loc.T("export.done"), rows.Count);
+            ShowFooterNotice(string.Format(Loc.T("export.done"), rows.Count));
         }
         catch (Exception ex)
         {
@@ -2437,9 +2450,9 @@ public partial class MainWindow : Window
         {
             string text = string.Join(Environment.NewLine, rows.Select(r => r.Path));
             Clipboard.SetText(text);
-            FooterText.Text = rows.Count == 1
+            ShowFooterNotice(rows.Count == 1
                 ? $"경로 복사됨: {rows[0].Path}"
-                : string.Format(Loc.T("ctx.copyPath.multi"), rows.Count);
+                : string.Format(Loc.T("ctx.copyPath.multi"), rows.Count));
         }
         catch { }
     }
@@ -2452,9 +2465,9 @@ public partial class MainWindow : Window
         {
             string text = string.Join(Environment.NewLine, rows.Select(r => r.Name));
             Clipboard.SetText(text);
-            FooterText.Text = rows.Count == 1
+            ShowFooterNotice(rows.Count == 1
                 ? $"이름 복사됨: {rows[0].Name}"
-                : string.Format(Loc.T("ctx.copyName.multi"), rows.Count);
+                : string.Format(Loc.T("ctx.copyName.multi"), rows.Count));
         }
         catch { }
     }
@@ -2469,7 +2482,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            FooterText.Text = $"속성 보기 실패: {ex.Message}";
+            ShowFooterNotice($"속성 보기 실패: {ex.Message}");
         }
     }
 
@@ -2482,7 +2495,7 @@ public partial class MainWindow : Window
         {
             if (!RobustDelete.PathExists(row.Path))
             {
-                FooterText.Text = $"{Loc.T("ctx.error")}: {row.Path}";
+                ShowFooterNotice($"{Loc.T("ctx.error")}: {row.Path}");
                 return;
             }
 
@@ -2516,7 +2529,7 @@ public partial class MainWindow : Window
             else
                 System.IO.File.Move(row.Path, newPath);
 
-            FooterText.Text = $"{oldName} → {newName}";
+            ShowFooterNotice($"{oldName} → {newName}");
             
             if (!string.IsNullOrEmpty(_lastSearchQuery) && SearchBox.Text == _lastSearchQuery)
                 RunSearch();
@@ -2547,19 +2560,19 @@ public partial class MainWindow : Window
 
             if (paths.Count == 0)
             {
-                FooterText.Text = $"{Loc.T("ctx.error")}: {Loc.T("ctx.copyFile.none")}";
+                ShowFooterNotice($"{Loc.T("ctx.error")}: {Loc.T("ctx.copyFile.none")}");
                 return;
             }
 
             Clipboard.SetFileDropList(paths);
 
-            FooterText.Text = paths.Count == 1
+            ShowFooterNotice(paths.Count == 1
                 ? $"{Loc.T("ctx.copyFile")}: {rows[0].Name}"
-                : string.Format(Loc.T("ctx.copyFile.multi"), paths.Count);
+                : string.Format(Loc.T("ctx.copyFile.multi"), paths.Count));
         }
         catch (Exception ex)
         {
-            FooterText.Text = $"{Loc.T("ctx.error")}: {ex.Message}";
+            ShowFooterNotice($"{Loc.T("ctx.error")}: {ex.Message}");
         }
     }
 
@@ -3114,7 +3127,7 @@ public partial class MainWindow : Window
             SearchBox.Focus();
             UpdateFooterSummary();
 
-            FooterText.Text = $"{Loc.T("status.refreshDone")} ({sw.ElapsedMilliseconds}ms)";
+            ShowFooterNotice($"{Loc.T("status.refreshDone")} ({sw.ElapsedMilliseconds}ms)");
         }
         catch (Exception ex)
         {

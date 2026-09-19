@@ -2,13 +2,18 @@ using Loc = HdrTracer.Core.Localization;
 
 namespace HdrTracer.App;
 
+/// <summary>
+/// 다이얼로그 공통 색/버튼/창. 메인 윈도우처럼 WindowStyle=None + WindowChrome로
+/// 제목 표시줄을 직접 그려, 타이틀 바 색(#252526)까지 메인 윈도우와 동일하게 맞춘다.
+/// (WPF+WinForms 동시 사용 환경의 타입 모호성을 피하려고 타입을 모두 정규화했다.)
+/// </summary>
 internal static class DialogTheme
 {
-    internal static readonly System.Windows.Media.Brush WindowBg  = Hex("#252526"); 
+    internal static readonly System.Windows.Media.Brush WindowBg  = Hex("#252526"); // 타이틀 바와 동일
     internal static readonly System.Windows.Media.Brush ButtonBg  = Hex("#2D2D30");
     internal static readonly System.Windows.Media.Brush BorderBg  = Hex("#3E3E42");
     internal static readonly System.Windows.Media.Brush HoverBg   = Hex("#3F3F46");
-    internal static readonly System.Windows.Media.Brush PressedBg = Hex("#007ACC");
+    internal static readonly System.Windows.Media.Brush PressedBg = Hex("#2D2D30");
     internal static readonly System.Windows.Media.Brush TextFg    = Hex("#F1F1F1");
     internal static readonly System.Windows.Media.Brush InputBg   = Hex("#1E1E1E");
     internal static readonly System.Windows.Media.Brush CloseHover = Hex("#C42B1C");
@@ -23,6 +28,26 @@ internal static class DialogTheme
 
     private static System.Windows.Style? _focusVisual;
 
+    internal static void FocusWhenReady(System.Windows.Window win, System.Windows.UIElement target)
+    {
+        win.Loaded += (_, _) =>
+        {
+            target.Focus();
+            win.Dispatcher.BeginInvoke(new Action(() =>
+            {
+                if (!target.IsKeyboardFocusWithin) target.Focus();
+            }), System.Windows.Threading.DispatcherPriority.Input);
+        };
+    }
+
+    /// <summary>
+    /// Tab으로 이동한 버튼을 알아볼 수 있게 하는 점선 테두리.
+    /// 이것이 없으면(FocusVisualStyle = null) 포커스는 이동하는데 화면에 표시가 없어
+    /// 사용자가 어느 버튼에 있는지 알 수 없다.
+    ///
+    /// App.xaml의 AppFocusVisual과 같은 모양으로 맞춘다(안쪽 2px · #E8E8EC · 굵기 1 · 2 2 점선).
+    /// 바깥쪽으로 그리면(Margin 음수) 창 모서리의 닫기 버튼에서 점선이 잘린다.
+    /// </summary>
     internal static System.Windows.Style FocusVisual()
     {
         if (_focusVisual is not null) return _focusVisual;
@@ -59,10 +84,26 @@ internal static class DialogTheme
         }
         bd.SetValue(System.Windows.Controls.Border.CornerRadiusProperty, new System.Windows.CornerRadius(corner));
 
+        var grid = new System.Windows.FrameworkElementFactory(typeof(System.Windows.Controls.Grid));
+
         var cp = new System.Windows.FrameworkElementFactory(typeof(System.Windows.Controls.ContentPresenter));
         cp.SetValue(System.Windows.Controls.ContentPresenter.HorizontalAlignmentProperty, System.Windows.HorizontalAlignment.Center);
         cp.SetValue(System.Windows.Controls.ContentPresenter.VerticalAlignmentProperty, System.Windows.VerticalAlignment.Center);
-        bd.AppendChild(cp);
+        grid.AppendChild(cp);
+
+        var ring = new System.Windows.FrameworkElementFactory(typeof(System.Windows.Shapes.Rectangle));
+        ring.Name = "FocusRing";
+        ring.SetValue(System.Windows.Shapes.Shape.StrokeProperty, Hex("#E8E8EC"));
+        ring.SetValue(System.Windows.Shapes.Shape.StrokeThicknessProperty, 1.0);
+        ring.SetValue(System.Windows.Shapes.Shape.StrokeDashArrayProperty,
+            new System.Windows.Media.DoubleCollection { 2, 2 });
+        ring.SetValue(System.Windows.FrameworkElement.MarginProperty, new System.Windows.Thickness(2));
+        ring.SetValue(System.Windows.UIElement.SnapsToDevicePixelsProperty, true);
+        ring.SetValue(System.Windows.UIElement.VisibilityProperty, System.Windows.Visibility.Collapsed);
+        ring.SetValue(System.Windows.UIElement.IsHitTestVisibleProperty, false);
+        grid.AppendChild(ring);
+
+        bd.AppendChild(grid);
 
         var tpl = new System.Windows.Controls.ControlTemplate(typeof(System.Windows.Controls.Button)) { VisualTree = bd };
 
@@ -74,9 +115,15 @@ internal static class DialogTheme
         p.Setters.Add(new System.Windows.Setter(System.Windows.Controls.Border.BackgroundProperty, pressed, "Bd"));
         tpl.Triggers.Add(p);
 
+        var f = new System.Windows.Trigger { Property = System.Windows.UIElement.IsKeyboardFocusedProperty, Value = true };
+        f.Setters.Add(new System.Windows.Setter(System.Windows.UIElement.VisibilityProperty,
+            System.Windows.Visibility.Visible, "FocusRing"));
+        tpl.Triggers.Add(f);
+
         return tpl;
     }
 
+    /// <summary>다크 톤 버튼(테두리 + 호버/누름 효과).</summary>
     internal static System.Windows.Controls.Button MakeButton(string content)
     {
         var btn = new System.Windows.Controls.Button
@@ -88,12 +135,13 @@ internal static class DialogTheme
             FontSize = 13,
             Cursor = System.Windows.Input.Cursors.Arrow,
             SnapsToDevicePixels = true,
-            FocusVisualStyle = FocusVisual(),
+            FocusVisualStyle = null,
             Template = ButtonTemplate(ButtonBg, HoverBg, PressedBg, BorderBg, 3)
         };
         return btn;
     }
 
+    /// <summary>제목 표시줄의 닫기(✕) 버튼.</summary>
     private static System.Windows.Controls.Button MakeCloseButton()
     {
         return new System.Windows.Controls.Button
@@ -104,11 +152,12 @@ internal static class DialogTheme
             Foreground = TextFg,
             FontSize = 12,
             Cursor = System.Windows.Input.Cursors.Arrow,
-            FocusVisualStyle = FocusVisual(),
+            FocusVisualStyle = null,
             Template = ButtonTemplate(System.Windows.Media.Brushes.Transparent, CloseHover, CloseHover, null, 0)
         };
     }
 
+    /// <summary>WindowStyle=None + WindowChrome로 OS 제목 표시줄 없는 빈 창을 만든다.</summary>
     internal static System.Windows.Window NewWindow(System.Windows.Window? owner)
     {
         var win = new System.Windows.Window
@@ -138,12 +187,14 @@ internal static class DialogTheme
         return win;
     }
 
+    /// <summary>커스텀 제목 표시줄(#252526) + 본문을 조립해 창에 채운다.</summary>
     internal static void Compose(System.Windows.Window win, string title, System.Windows.FrameworkElement body)
     {
         var rootGrid = new System.Windows.Controls.Grid();
         rootGrid.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = new System.Windows.GridLength(34) });
         rootGrid.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = System.Windows.GridLength.Auto });
 
+        // 제목 표시줄 (메인 윈도우와 동일한 #252526)
         var bar = new System.Windows.Controls.Grid { Background = WindowBg };
         bar.ColumnDefinitions.Add(new System.Windows.Controls.ColumnDefinition { Width = new System.Windows.GridLength(1, System.Windows.GridUnitType.Star) });
         bar.ColumnDefinitions.Add(new System.Windows.Controls.ColumnDefinition { Width = System.Windows.GridLength.Auto });
@@ -175,6 +226,7 @@ internal static class DialogTheme
         System.Windows.Controls.Grid.SetRow(body, 1);
         rootGrid.Children.Add(body);
 
+        // 부모(다크)와 구분되도록 가는 외곽선
         var outer = new System.Windows.Controls.Border
         {
             BorderBrush = BorderBg,
@@ -186,6 +238,7 @@ internal static class DialogTheme
     }
 }
 
+/// <summary>버튼 글자까지 앱 언어(한/영)를 따르는 확인 대화상자.</summary>
 internal static class ConfirmDialog
 {
     public static bool Show(System.Windows.Window? owner, string title, string message)
@@ -228,13 +281,14 @@ internal static class ConfirmDialog
         btnRow.Children.Add(cancelBtn);
         body.Children.Add(btnRow);
 
-        win.Loaded += (_, _) => okBtn.Focus();
+        DialogTheme.FocusWhenReady(win, okBtn);
 
         DialogTheme.Compose(win, title, body);
         return win.ShowDialog() == true;
     }
 }
 
+/// <summary>한 줄 텍스트 입력 대화상자(이름 바꾸기 등). 동일한 다크 스타일.</summary>
 internal static class InputDialog
 {
     public static string? Show(System.Windows.Window? owner, string title, string prompt, string defaultValue, bool selectAll)
@@ -295,9 +349,10 @@ internal static class InputDialog
 
         DialogTheme.Compose(win, title, body);
 
+        DialogTheme.FocusWhenReady(win, tb);
+
         win.Loaded += (_, _) =>
         {
-            tb.Focus();
             if (selectAll)
             {
                 tb.SelectAll();
@@ -314,6 +369,7 @@ internal static class InputDialog
     }
 }
 
+/// <summary>확인 버튼 하나짜리 정보 대화상자. "#제목" / "예시|설명" 형식을 2열로 정렬해 그린다.</summary>
 internal static class InfoDialog
 {
     public static void Show(System.Windows.Window? owner, string title, string message)
@@ -329,6 +385,7 @@ internal static class InfoDialog
         var stack = new System.Windows.Controls.StackPanel();
         System.Windows.Controls.Grid.SetRow(stack, 0);
 
+        // 예시|설명 2열 정렬용 공유 그리드
         var table = new System.Windows.Controls.Grid();
         table.ColumnDefinitions.Add(new System.Windows.Controls.ColumnDefinition { Width = System.Windows.GridLength.Auto });
         table.ColumnDefinitions.Add(new System.Windows.Controls.ColumnDefinition { Width = new System.Windows.GridLength(1, System.Windows.GridUnitType.Star) });
@@ -348,14 +405,14 @@ internal static class InfoDialog
         {
             string line = rawLine.TrimEnd('\r');
 
-            if (line.Length == 0)                       
+            if (line.Length == 0)                       // 빈 줄 = 섹션 간격
             {
                 FlushTable();
                 stack.Children.Add(new System.Windows.Controls.Border { Height = 12 });
                 continue;
             }
 
-            if (line.StartsWith("#"))                   
+            if (line.StartsWith("#"))                   // 섹션 제목
             {
                 FlushTable();
                 stack.Children.Add(new System.Windows.Controls.TextBlock
@@ -370,7 +427,7 @@ internal static class InfoDialog
             }
 
             int bar = line.IndexOf('|');
-            if (bar > 0)                                 
+            if (bar > 0)                                 // 예시 | 설명 (2열)
             {
                 table.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = System.Windows.GridLength.Auto });
 
@@ -406,6 +463,7 @@ internal static class InfoDialog
                 continue;
             }
 
+            // 일반 문장
             FlushTable();
             stack.Children.Add(new System.Windows.Controls.TextBlock
             {
@@ -428,7 +486,7 @@ internal static class InfoDialog
         System.Windows.Controls.Grid.SetRow(okBtn, 2);
         body.Children.Add(okBtn);
 
-        win.Loaded += (_, _) => okBtn.Focus();
+        DialogTheme.FocusWhenReady(win, okBtn);
 
         DialogTheme.Compose(win, title, body);
         win.ShowDialog();
