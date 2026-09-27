@@ -191,6 +191,7 @@ public static partial class Localization
             "photo >2026-01|modified since Jan 2026 (year-month-day order)\n" +
             "*.pdf <2024|pdf modified before 2024\n" +
             "report >week|last 7 days (today · week · month · year)\n" +
+            ">100MB >week|size and date can be combined\n" +
             "\n" +
             "With * the whole name must match the shape.\n" +
             "You can also right-click a result → 'Search in this folder'.\n" +
@@ -233,5 +234,14 @@ public static partial class Localization
         ["dn.permSuffix"]       = "{0} permanently",
         ["dn.cancelled"]       = "Delete cancelled.",
         ["dn.cancelSuffix"]    = "{0} cancelled",
+
+        ["status.noDrive"] = "No drives",
+        ["status.noNtfs"] = "⚠ No NTFS drives available to index.",
+        ["status.building"] = "Building index",
+        ["err.open"] = "Failed to open: {0}",
+        ["err.reveal"] = "Failed to show in folder: {0}",
+        ["err.props"] = "Failed to show properties: {0}",
+        ["ctx.copyPath.one"] = "Path copied: {0}",
+        ["ctx.copyName.one"] = "Name copied: {0}",
     };
 }

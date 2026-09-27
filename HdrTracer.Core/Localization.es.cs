@@ -189,6 +189,7 @@ public static partial class Localization
             "foto >2026-01|modificados desde enero de 2026 (orden año-mes-día)\n" +
             "*.pdf <2024|pdf modificados antes de 2024\n" +
             "informe >week|últimos 7 días (today · week · month · year)\n" +
+            ">100MB >week|tamaño y fecha se pueden combinar\n" +
             "\n" +
             "Con * el nombre completo debe coincidir con la forma.\n" +
             "También puedes hacer clic derecho en un resultado → 'Buscar solo en esta carpeta'.\n" +
@@ -231,5 +232,14 @@ public static partial class Localization
         ["dn.permSuffix"]       = "{0} permanentemente",
         ["dn.cancelled"]       = "Eliminación cancelada.",
         ["dn.cancelSuffix"]    = "{0} cancelados",
+
+        ["status.noDrive"] = "Sin unidades",
+        ["status.noNtfs"] = "⚠ No hay unidades NTFS que indexar.",
+        ["status.building"] = "Creando índice",
+        ["err.open"] = "No se pudo abrir: {0}",
+        ["err.reveal"] = "No se pudo mostrar en la carpeta: {0}",
+        ["err.props"] = "No se pudieron mostrar las propiedades: {0}",
+        ["ctx.copyPath.one"] = "Ruta copiada: {0}",
+        ["ctx.copyName.one"] = "Nombre copiado: {0}",
     };
 }

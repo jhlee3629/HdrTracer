@@ -35,8 +35,9 @@ public partial class MainWindow : Window
 
     private bool _contextMenuOpen;
 
-    private readonly HashSet<string> _recentlyDeletedPaths =
-        new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<(HdrTracer.Core.FileIndex Index, int Entry), long> _recentlyDeletedEntries = new();
+
+    private const long RecentlyDeletedTtlMs = 5000;
 
     private enum SortColumn { Drive, Name, Path, Size, Date, Kind }
     private SortColumn _sortColumn = SortColumn.Name;
@@ -342,15 +343,15 @@ public partial class MainWindow : Window
 
         if (drives.Count == 0)
         {
-            StatusText.Text = "⚠ 인덱싱 가능한 NTFS 드라이브가 없습니다.";
+            StatusText.Text = Loc.T("status.noNtfs");
             StatusText.Foreground = System.Windows.Media.Brushes.OrangeRed;
-            FooterText.Text = "드라이브 없음";
+            FooterText.Text = Loc.T("status.noDrive");
             SearchBox.IsEnabled = true;
             SearchBox.Focus();
             return;
         }
 
-        FooterText.Text = "인덱스 빌드 중";
+        FooterText.Text = Loc.T("status.building");
 
         foreach (var d in drives)
             _multi.AddSlot(new MultiDriveIndex.DriveSlot { DriveLetter = d });
@@ -510,6 +511,9 @@ public partial class MainWindow : Window
 
     private void StartMonitorIfReady(MultiDriveIndex.DriveSlot slot)
     {
+        if (slot.Index is { NameRankReady: false } rankTarget)
+            _ = Task.Run(() => { try { rankTarget.BuildNameRank(); } catch { } });
+
         if (slot.Index is null || slot.Monitor is not null) return;
         try
         {
@@ -920,47 +924,45 @@ public partial class MainWindow : Window
 
             if (mySeq != _searchSequence) return;
 
-            if (_recentlyDeletedPaths.Count > 0)
+            if (_recentlyDeletedEntries.Count > 0)
             {
-                sortedRows = sortedRows.Where(r =>
-                {
-                    if (!_recentlyDeletedPaths.Contains(r.Path)) return true;
-                    if (RobustDelete.PathExists(r.Path))
-                    {
-                        _recentlyDeletedPaths.Remove(r.Path);
-                        return true;
-                    }
-                    return false;
-                }).ToList();
+                long now = Environment.TickCount64;
+                foreach (var old in _recentlyDeletedEntries.Where(kv => now - kv.Value > RecentlyDeletedTtlMs)
+                                                           .Select(kv => kv.Key).ToList())
+                    _recentlyDeletedEntries.Remove(old);
             }
 
-            var prevSelectedPaths = new HashSet<string>(
-                ResultsList.SelectedItems.OfType<SearchResultRow>().Select(r => r.Path),
-                StringComparer.OrdinalIgnoreCase);
+            if (_recentlyDeletedEntries.Count > 0)
+            {
+                sortedRows = sortedRows
+                    .Where(r => !_recentlyDeletedEntries.ContainsKey((r.SourceIndex, r.EntryIndex)))
+                    .ToList();
+            }
+
+            var prevSelected = new HashSet<(HdrTracer.Core.FileIndex, int)>();
+            foreach (var r in ResultsList.SelectedItems.OfType<SearchResultRow>())
+                prevSelected.Add((r.SourceIndex, r.EntryIndex));
 
             sw.Stop();
             SetResultRows(sortedRows);
             EmptyHint.Visibility = sortedRows.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
             _lastSearchQuery = query;
 
-            if (prevSelectedPaths.Count > 0)
+            if (prevSelected.Count > 0)
             {
                 _restoringSelection = true;
                 try
                 {
                     ResultsList.SelectedItems.Clear();
 
-                    // 찾을 개수를 다 채우면 멈춘다. 이전 선택이 1개인데
-                    // 18만 건을 끝까지 훑으면 그것만으로 300ms가 넘는다.
-                    int want = prevSelectedPaths.Count;
-                    int found = 0;
+                    int remaining = prevSelected.Count;
 
                     foreach (var r in sortedRows)
                     {
-                        if (!prevSelectedPaths.Contains(r.Path)) continue;
+                        if (!prevSelected.Contains((r.SourceIndex, r.EntryIndex))) continue;
 
                         ResultsList.SelectedItems.Add(r);
-                        if (++found >= want) break;
+                        if (--remaining == 0) break;
                     }
                 }
                 finally
@@ -1215,7 +1217,16 @@ public partial class MainWindow : Window
         }
 
         if (s.WinMaximized)
+        {
             WindowState = WindowState.Maximized;
+            Loaded += MaximizeClampOnLoaded;
+        }
+    }
+
+    private void MaximizeClampOnLoaded(object sender, RoutedEventArgs e)
+    {
+        Loaded -= MaximizeClampOnLoaded;
+        MainWindow_StateChanged(this, EventArgs.Empty);
     }
 
     private void ResetColumnWidths()
@@ -1296,7 +1307,7 @@ public partial class MainWindow : Window
 
     public void BringToFront()
     {
-        Dispatcher.Invoke(() =>
+        _ = Dispatcher.BeginInvoke(new Action(() =>
         {
             if (_trayIcon is not null)
             {
@@ -1311,7 +1322,144 @@ public partial class MainWindow : Window
                 Topmost = false;
                 Focus();
             }
-        });
+        }));
+    }
+
+    private static ulong NamePrefixKey(SearchResultRow r, int start)
+    {
+        var s = r.SourceIndex.GetNameSpan(r.EntryIndex);
+        ulong k = 0;
+        for (int i = 0; i < 4; i++)
+        {
+            int p = start + i;
+            char c = p < s.Length ? char.ToUpperInvariant(s[p]) : '\0';
+            k = (k << 16) | c;
+        }
+        return k;
+    }
+
+    private static List<SearchResultRow> SortByName(List<SearchResultRow> rows)
+    {
+        var groups = new Dictionary<HdrTracer.Core.FileIndex, (List<SearchResultRow> Ranked, List<int> Keys, List<SearchResultRow> Unranked)>();
+        var snapshots = new Dictionary<HdrTracer.Core.FileIndex, (int[] Ranks, int Count)>();
+
+        foreach (var r in rows)
+        {
+            var ix = r.SourceIndex;
+            if (!groups.TryGetValue(ix, out var g))
+            {
+                g = (new List<SearchResultRow>(), new List<int>(), new List<SearchResultRow>());
+                groups[ix] = g;
+                snapshots[ix] = ix.GetNameRankSnapshot();
+            }
+
+            var snap = snapshots[ix];
+            int rank = (uint)r.EntryIndex < (uint)snap.Count ? snap.Ranks[r.EntryIndex] : -1;
+            if (rank >= 0)
+            {
+                g.Ranked.Add(r);
+                g.Keys.Add(rank);
+            }
+            else
+            {
+                g.Unranked.Add(r);
+            }
+        }
+
+        var sorted = new List<List<SearchResultRow>>(groups.Count);
+        foreach (var (ix, g) in groups)
+        {
+            var keys = g.Keys.ToArray();
+            var items = g.Ranked.ToArray();
+            Array.Sort(keys, items);
+            var list = new List<SearchResultRow>(items);
+
+            if (g.Unranked.Count > 0)
+            {
+                var extra = SortUnranked(g.Unranked);
+                list = InsertSorted(list, extra);
+
+                if (ix.UnrankedEstimate > 20_000)
+                    _ = Task.Run(() => { try { ix.BuildNameRank(); } catch { } });
+            }
+            sorted.Add(list);
+        }
+
+        return sorted.Count == 1 ? sorted[0] : MergeSorted(sorted);
+    }
+
+    private static List<SearchResultRow> SortUnranked(List<SearchResultRow> rows)
+    {
+        if (rows.Count >= 50_000)
+        {
+            return rows.AsParallel()
+                       .OrderBy(r => NamePrefixKey(r, 0))
+                       .ThenBy(r => NamePrefixKey(r, 4))
+                       .ThenBy(r => r, RowNameComparer.Instance)
+                       .ToList();
+        }
+        var copy = new List<SearchResultRow>(rows);
+        copy.Sort(RowNameComparer.Instance);
+        return copy;
+    }
+
+    private static List<SearchResultRow> InsertSorted(List<SearchResultRow> baseList, List<SearchResultRow> extra)
+    {
+        if (extra.Count == 0) return baseList;
+        if (baseList.Count == 0) return extra;
+
+        var cmp = RowNameComparer.Instance;
+        var result = new List<SearchResultRow>(baseList.Count + extra.Count);
+        int b = 0;
+        foreach (var x in extra)
+        {
+            int lo = b, hi = baseList.Count;
+            while (lo < hi)
+            {
+                int mid = (lo + hi) >> 1;
+                if (cmp.Compare(baseList[mid], x) <= 0) lo = mid + 1;
+                else hi = mid;
+            }
+            while (b < lo) result.Add(baseList[b++]);
+            result.Add(x);
+        }
+        while (b < baseList.Count) result.Add(baseList[b++]);
+        return result;
+    }
+
+    private static List<SearchResultRow> MergeSorted(List<List<SearchResultRow>> lists)
+    {
+        var cmp = RowNameComparer.Instance;
+        int total = 0;
+        foreach (var l in lists) total += l.Count;
+
+        var result = new List<SearchResultRow>(total);
+        var pos = new int[lists.Count];
+        while (result.Count < total)
+        {
+            int best = -1;
+            for (int i = 0; i < lists.Count; i++)
+            {
+                if (pos[i] >= lists[i].Count) continue;
+                if (best < 0 || cmp.Compare(lists[i][pos[i]], lists[best][pos[best]]) < 0) best = i;
+            }
+            result.Add(lists[best][pos[best]++]);
+        }
+        return result;
+    }
+
+    private sealed class RowNameComparer : IComparer<SearchResultRow>
+    {
+        public static readonly RowNameComparer Instance = new();
+
+        public int Compare(SearchResultRow? a, SearchResultRow? b)
+        {
+            if (ReferenceEquals(a, b)) return 0;
+            if (a is null) return -1;
+            if (b is null) return 1;
+            return a.SourceIndex.GetNameSpan(a.EntryIndex)
+                    .CompareTo(b.SourceIndex.GetNameSpan(b.EntryIndex), StringComparison.OrdinalIgnoreCase);
+        }
     }
 
     private List<SearchResultRow> SortRows(List<SearchResultRow> rows)
@@ -1323,21 +1471,35 @@ public partial class MainWindow : Window
             if (rows.Count >= 50_000)
             {
                 var sorted = _sortAscending
-                    ? rows.AsParallel().OrderBy(r => r.SizeBytes)
-                    : rows.AsParallel().OrderByDescending(r => r.SizeBytes);
+                    ? rows.AsParallel().OrderBy(r => r.SortSize)
+                    : rows.AsParallel().OrderByDescending(r => r.SortSize);
                 return sorted.ToList();
             }
             var copy = new List<SearchResultRow>(rows);
-            if (_sortAscending) copy.Sort((a, b) => a.SizeBytes.CompareTo(b.SizeBytes));
-            else copy.Sort((a, b) => b.SizeBytes.CompareTo(a.SizeBytes));
+            if (_sortAscending) copy.Sort((a, b) => a.SortSize.CompareTo(b.SortSize));
+            else copy.Sort((a, b) => b.SortSize.CompareTo(a.SortSize));
             return copy;
         }
         if (_sortColumn == SortColumn.Date)
         {
             var sorted = _sortAscending
-                ? rows.AsParallel().OrderBy(r => r.ModifiedUtc)
-                : rows.AsParallel().OrderByDescending(r => r.ModifiedUtc);
+                ? rows.AsParallel().OrderBy(r => r.SortModified)
+                : rows.AsParallel().OrderByDescending(r => r.SortModified);
             return sorted.ToList();
+        }
+
+        if (_sortColumn == SortColumn.Name)
+        {
+            if (rows.Count >= 50_000)
+            {
+                var byName = SortByName(rows);
+                if (!_sortAscending) byName.Reverse();
+                return byName;
+            }
+            var nameCopy = new List<SearchResultRow>(rows);
+            if (_sortAscending) nameCopy.Sort(RowNameComparer.Instance);
+            else nameCopy.Sort((a, b) => RowNameComparer.Instance.Compare(b, a));
+            return nameCopy;
         }
 
         Func<SearchResultRow, string> keySelector = _sortColumn switch
@@ -1401,7 +1563,7 @@ public partial class MainWindow : Window
         var row = GetSelectedRow();
         if (row is null) return;
         try { ShowFileProperties(row.Path); }
-        catch (Exception ex) { ShowFooterNotice($"속성 보기 실패: {ex.Message}"); }
+        catch (Exception ex) { ShowFooterNotice(string.Format(Loc.T("err.props"), ex.Message)); }
     }
 
     private void CopyFileCommand_Executed(object sender, ExecutedRoutedEventArgs e)
@@ -1416,7 +1578,7 @@ public partial class MainWindow : Window
         try
         {
             Clipboard.SetText(row.Path);
-            ShowFooterNotice($"경로 복사됨: {row.Path}");
+            ShowFooterNotice(string.Format(Loc.T("ctx.copyPath.one"), row.Path));
         }
         catch { }
     }
@@ -2265,7 +2427,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            ShowFooterNotice($"열기 실패: {ex.Message}");
+            ShowFooterNotice(string.Format(Loc.T("err.open"), ex.Message));
         }
     }
 
@@ -2280,7 +2442,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            ShowFooterNotice($"폴더에서 보기 실패: {ex.Message}");
+            ShowFooterNotice(string.Format(Loc.T("err.reveal"), ex.Message));
         }
     }
 
@@ -2451,7 +2613,7 @@ public partial class MainWindow : Window
             string text = string.Join(Environment.NewLine, rows.Select(r => r.Path));
             Clipboard.SetText(text);
             ShowFooterNotice(rows.Count == 1
-                ? $"경로 복사됨: {rows[0].Path}"
+                ? string.Format(Loc.T("ctx.copyPath.one"), rows[0].Path)
                 : string.Format(Loc.T("ctx.copyPath.multi"), rows.Count));
         }
         catch { }
@@ -2466,7 +2628,7 @@ public partial class MainWindow : Window
             string text = string.Join(Environment.NewLine, rows.Select(r => r.Name));
             Clipboard.SetText(text);
             ShowFooterNotice(rows.Count == 1
-                ? $"이름 복사됨: {rows[0].Name}"
+                ? string.Format(Loc.T("ctx.copyName.one"), rows[0].Name)
                 : string.Format(Loc.T("ctx.copyName.multi"), rows.Count));
         }
         catch { }
@@ -2482,7 +2644,7 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            ShowFooterNotice($"속성 보기 실패: {ex.Message}");
+            ShowFooterNotice(string.Format(Loc.T("err.props"), ex.Message));
         }
     }
 
@@ -2629,8 +2791,17 @@ public partial class MainWindow : Window
 
         if (ResultsList.ItemsSource is List<SearchResultRow> shown && report.DeletedPaths.Count > 0)
         {
-            foreach (var p in report.DeletedPaths) _recentlyDeletedPaths.Add(p);
-            var remaining = shown.Where(r => !report.DeletedPaths.Contains(r.Path)).ToList();
+            long now = Environment.TickCount64;
+            var gone = new HashSet<(HdrTracer.Core.FileIndex, int)>();
+            foreach (var r in rows)
+            {
+                if (!report.DeletedPaths.Contains(r.Path)) continue;
+                var key = (r.SourceIndex, r.EntryIndex);
+                gone.Add(key);
+                _recentlyDeletedEntries[key] = now;
+            }
+
+            var remaining = shown.Where(r => !gone.Contains((r.SourceIndex, r.EntryIndex))).ToList();
             SetResultRows(remaining);
         }
     }
@@ -3288,6 +3459,14 @@ public sealed class SearchResultRow
     public string ModifiedText { get { ResolveMeta(); return _modifiedText; } }
     public long SizeBytes { get { ResolveMeta(); return _sizeBytes; } }
     public DateTime ModifiedUtc { get { ResolveMeta(); return _modifiedUtc; } }
+
+    public long SortSize
+        => _metaResolved ? _sizeBytes
+         : SourceIndex.HasMetadata(EntryIndex) ? SourceIndex.GetSize(EntryIndex) : 0;
+
+    public DateTime SortModified
+        => _metaResolved ? _modifiedUtc
+         : SourceIndex.HasMetadata(EntryIndex) ? SourceIndex.GetModifiedUtc(EntryIndex) : DateTime.MinValue;
 
     public System.Windows.Media.ImageSource? Icon
     {

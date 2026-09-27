@@ -189,6 +189,7 @@ public static partial class Localization
             "照片 >2026-01|2026 年 1 月以后修改（年-月-日 顺序）\n" +
             "*.pdf <2024|2024 年之前修改的 pdf\n" +
             "报告 >week|最近 7 天（today · week · month · year）\n" +
+            ">100MB >week|大小和日期可以一起使用\n" +
             "\n" +
             "使用 * 时，名称整体必须与该形式匹配。\n" +
             "也可以右键点击结果 → “仅在此文件夹中搜索”。\n" +
@@ -231,5 +232,14 @@ public static partial class Localization
         ["dn.permSuffix"]       = "永久删除 {0} 个",
         ["dn.cancelled"]       = "已取消删除。",
         ["dn.cancelSuffix"]    = "取消 {0} 个",
+
+        ["status.noDrive"] = "无驱动器",
+        ["status.noNtfs"] = "⚠ 没有可索引的 NTFS 驱动器。",
+        ["status.building"] = "正在构建索引",
+        ["err.open"] = "打开失败：{0}",
+        ["err.reveal"] = "在文件夹中显示失败：{0}",
+        ["err.props"] = "查看属性失败：{0}",
+        ["ctx.copyPath.one"] = "已复制路径：{0}",
+        ["ctx.copyName.one"] = "已复制名称：{0}",
     };
 }

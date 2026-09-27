@@ -189,6 +189,7 @@ public static partial class Localization
             "写真 >2026-01|2026 年 1 月以降に更新（年-月-日 の順）\n" +
             "*.pdf <2024|2024 年より前に更新された pdf\n" +
             "報告書 >week|直近 7 日間（today · week · month · year）\n" +
+            ">100MB >week|サイズと期間は組み合わせて使える\n" +
             "\n" +
             "* を使うと、名前全体がその形と一致する必要があります。\n" +
             "結果を右クリック →「このフォルダー内だけを検索」でも指定できます。\n" +
@@ -231,5 +232,14 @@ public static partial class Localization
         ["dn.permSuffix"]       = "完全削除 {0} 件",
         ["dn.cancelled"]       = "削除を取り消しました。",
         ["dn.cancelSuffix"]    = "取り消し {0} 件",
+
+        ["status.noDrive"] = "ドライブなし",
+        ["status.noNtfs"] = "⚠ インデックスできる NTFS ドライブがありません。",
+        ["status.building"] = "インデックス作成中",
+        ["err.open"] = "開けませんでした: {0}",
+        ["err.reveal"] = "フォルダーで表示できませんでした: {0}",
+        ["err.props"] = "プロパティを表示できませんでした: {0}",
+        ["ctx.copyPath.one"] = "パスをコピーしました: {0}",
+        ["ctx.copyName.one"] = "名前をコピーしました: {0}",
     };
 }

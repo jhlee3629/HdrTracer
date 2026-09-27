@@ -9,9 +9,13 @@ public partial class App : Application
 {
     private const string MutexName  = "HdrTracer_SingleInstance_Mutex_8B5F3A2C";
     private const string SignalName = "HdrTracer_SingleInstance_Signal_8B5F3A2C";
+    private const string AckName    = "HdrTracer_SingleInstance_Ack_8B5F3A2C";
+
+    private const int AckTimeoutMs = 2500;
 
     private Mutex? _mutex;
     private EventWaitHandle? _signal;
+    private EventWaitHandle? _ack;
     private Thread? _signalThread;
     private bool _isFirstInstance;
 
@@ -19,7 +23,7 @@ public partial class App : Application
     {
         try
         {
-            _mutex = new Mutex(initiallyOwned: true, MutexName, out _isFirstInstance);
+            _mutex = new Mutex(initiallyOwned: false, MutexName, out _isFirstInstance);
         }
         catch
         {
@@ -27,38 +31,58 @@ public partial class App : Application
             _mutex = null;
         }
 
-        if (!_isFirstInstance)
+        if (!_isFirstInstance && TrySignalRunningInstance())
         {
-            try
-            {
-                if (EventWaitHandle.TryOpenExisting(SignalName, out var existing))
-                {
-                    existing.Set();
-                    existing.Dispose();
-                }
-            }
-            catch { }
-
             Shutdown();
             return;
         }
+
+        _isFirstInstance = true;
 
         base.OnStartup(e);
 
         try
         {
             _signal = new EventWaitHandle(false, EventResetMode.AutoReset, SignalName);
+            _ack = new EventWaitHandle(false, EventResetMode.AutoReset, AckName);
             _signalThread = new Thread(SignalWaitLoop) { IsBackground = true, Name = "SingleInstanceSignal" };
             _signalThread.Start();
         }
         catch
         {
             _signal = null;
+            _ack = null;
         }
 
         var window = new MainWindow();
         MainWindow = window;
         window.Show();
+    }
+
+    private static bool TrySignalRunningInstance()
+    {
+        EventWaitHandle? signal = null;
+        EventWaitHandle? ack = null;
+        try
+        {
+            if (!EventWaitHandle.TryOpenExisting(SignalName, out signal)) return false;
+
+            EventWaitHandle.TryOpenExisting(AckName, out ack);
+            if (ack is null) return false;
+
+            ack.Reset();
+            signal.Set();
+            return ack.WaitOne(AckTimeoutMs);
+        }
+        catch
+        {
+            return false;
+        }
+        finally
+        {
+            try { signal?.Dispose(); } catch { }
+            try { ack?.Dispose(); } catch { }
+        }
     }
 
     private void SignalWaitLoop()
@@ -69,7 +93,7 @@ public partial class App : Application
         {
             try
             {
-                _signal.WaitOne();   
+                _signal.WaitOne();
             }
             catch
             {
@@ -78,11 +102,18 @@ public partial class App : Application
 
             try
             {
-                Dispatcher.Invoke(() =>
+                Dispatcher.BeginInvoke(new Action(() =>
                 {
-                    if (Current?.MainWindow is HdrTracer.App.MainWindow mw)
-                        mw.BringToFront();
-                });
+                    try
+                    {
+                        if (Current?.MainWindow is HdrTracer.App.MainWindow mw)
+                            mw.BringToFront();
+                    }
+                    finally
+                    {
+                        try { _ack?.Set(); } catch { }
+                    }
+                }));
             }
             catch { }
         }
@@ -91,12 +122,8 @@ public partial class App : Application
     protected override void OnExit(ExitEventArgs e)
     {
         try { _signal?.Dispose(); } catch { }
-        try
-        {
-            if (_isFirstInstance) _mutex?.ReleaseMutex();
-            _mutex?.Dispose();
-        }
-        catch { }
+        try { _ack?.Dispose(); } catch { }
+        try { _mutex?.Dispose(); } catch { }
         base.OnExit(e);
     }
 }

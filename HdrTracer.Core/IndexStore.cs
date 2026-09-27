@@ -7,7 +7,7 @@ namespace HdrTracer.Core;
 public static class IndexStore
 {
     private const uint Magic = 0x43525448;
-    private const int Version = 4;
+    private const int Version = 6;
 
     public sealed class CacheData
     {

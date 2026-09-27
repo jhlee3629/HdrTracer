@@ -191,6 +191,7 @@ public static partial class Localization
             "사진 >2026-01|2026년 1월 이후 수정된 것만 (연-월-일 순서)\n" +
             "*.pdf <2024|2024년 이전에 수정된 pdf\n" +
             "보고서 >week|최근 7일 (today · week · month · year)\n" +
+            ">100MB >week|크기와 기간을 함께 쓸 수 있음\n" +
             "\n" +
             "* 이 있으면 이름 전체가 그 모양과 일치해야 합니다.\n" +
             "폴더 검색은 결과를 우클릭해 '이 폴더에서만 검색'을 눌러도 됩니다.\n" +
@@ -233,5 +234,14 @@ public static partial class Localization
         ["dn.permSuffix"]       = "영구 삭제 {0}개",
         ["dn.cancelled"]       = "삭제를 취소했습니다.",
         ["dn.cancelSuffix"]    = "취소 {0}개",
+
+        ["status.noDrive"] = "드라이브 없음",
+        ["status.noNtfs"] = "⚠ 인덱싱 가능한 NTFS 드라이브가 없습니다.",
+        ["status.building"] = "인덱스 빌드 중",
+        ["err.open"] = "열기 실패: {0}",
+        ["err.reveal"] = "폴더에서 보기 실패: {0}",
+        ["err.props"] = "속성 보기 실패: {0}",
+        ["ctx.copyPath.one"] = "경로 복사됨: {0}",
+        ["ctx.copyName.one"] = "이름 복사됨: {0}",
     };
 }

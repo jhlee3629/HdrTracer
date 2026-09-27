@@ -547,6 +547,8 @@ public static class RawMftReader
         var baseInfo = ParseMftRecordAt(data, recPos);
         if (!baseInfo.IsValid) return;
 
+        ulong selfRef = mftRef | ((ulong)BitConverter.ToUInt16(data, recPos + 0x10) << 48);
+
         ushort firstAttrOffset = BitConverter.ToUInt16(data, recPos + 0x14);
         int pos = recPos + firstAttrOffset;
         int end = recPos + recordSize;
@@ -565,7 +567,7 @@ public static class RawMftReader
                 int dataPos = pos + contentOffset;
                 if (dataPos + 0x42 < data.Length)
                 {
-                    ulong parentRef = BitConverter.ToUInt64(data, dataPos + 0x00) & 0x0000FFFFFFFFFFFFUL;
+                    ulong parentRef = BitConverter.ToUInt64(data, dataPos + 0x00);
                     byte nameLen = data[dataPos + 0x40];
                     byte nameSpace = data[dataPos + 0x41];
                     int nameByteLen = nameLen * 2;
@@ -592,7 +594,7 @@ public static class RawMftReader
             {
                 fixed (char* nptr = name)
                 {
-                    index.Add(nptr, name.Length, mftRef, parent, baseInfo.IsDirectory, baseInfo.Size, baseInfo.IsHiddenSystem);
+                    index.Add(nptr, name.Length, selfRef, parent, baseInfo.IsDirectory, baseInfo.Size, baseInfo.IsHiddenSystem);
                 }
             }
             if (baseInfo.ModifiedTicks > 0)
@@ -606,6 +608,8 @@ public static class RawMftReader
     {
         var baseInfo = ParseMftRecordAt(data, recPos);
         if (!baseInfo.IsValid) return;
+
+        ulong selfRef = mftRef | ((ulong)BitConverter.ToUInt16(data, recPos + 0x10) << 48);
 
         var names = new List<(ulong parent, string name, byte ns)>();
         CollectFileNames(data, recPos, recordSize, names);
@@ -658,7 +662,7 @@ public static class RawMftReader
             {
                 fixed (char* nptr = name)
                 {
-                    index.Add(nptr, name.Length, mftRef, parent, baseInfo.IsDirectory, baseInfo.Size, baseInfo.IsHiddenSystem);
+                    index.Add(nptr, name.Length, selfRef, parent, baseInfo.IsDirectory, baseInfo.Size, baseInfo.IsHiddenSystem);
                 }
             }
             if (baseInfo.ModifiedTicks > 0)
@@ -687,7 +691,7 @@ public static class RawMftReader
                 int dataPos = pos + contentOffset;
                 if (dataPos + 0x42 < data.Length)
                 {
-                    ulong parentRef = BitConverter.ToUInt64(data, dataPos + 0x00) & 0x0000FFFFFFFFFFFFUL;
+                    ulong parentRef = BitConverter.ToUInt64(data, dataPos + 0x00);
                     byte nameLen = data[dataPos + 0x40];
                     byte nameSpace = data[dataPos + 0x41];
                     int nameByteLen = nameLen * 2;

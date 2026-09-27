@@ -35,6 +35,12 @@ public sealed class FileIndex
 
     private readonly Dictionary<ulong, int> _mftToIndex = new(InitialCapacity);
     private ulong[] _parentRefs = new ulong[InitialCapacity];
+    private ushort[] _selfSeqs = new ushort[InitialCapacity];
+
+    private int[] _nameRank = Array.Empty<int>();
+    private int _rankedCount;
+    private int _renamedSinceRank;
+    private int _rankBuilding;
 
     /// <summary>배열에 자리를 차지한 항목 수. 삭제 표시된 것도 포함한다(내부용).</summary>
     public int Count => _count;
@@ -68,6 +74,7 @@ public sealed class FileIndex
         {
             Array.Resize(ref _entries, _entries.Length * 2);
             Array.Resize(ref _parentRefs, _parentRefs.Length * 2);
+            Array.Resize(ref _selfSeqs, _selfSeqs.Length * 2);
         }
         EnsurePoolCapacity(nameLen);
 
@@ -92,7 +99,8 @@ public sealed class FileIndex
             Size        = size,
             MftRef      = selfMasked
         };
-        _parentRefs[_count] = parentRef & MftRefMask;
+        _parentRefs[_count] = parentRef;
+        _selfSeqs[_count] = (ushort)(mftRef >> 48);
 
         _mftToIndex.TryAdd(selfMasked, _count);
         _poolPos += nameLen;
@@ -103,11 +111,26 @@ public sealed class FileIndex
     public int LinkParents()
     {
         int rootCount = 0;
+        int stale = 0;
         for (int i = 0; i < _count; i++)
         {
-            ulong pRef = _parentRefs[i];
-            if (_mftToIndex.TryGetValue(pRef, out int parentIdx) && parentIdx != i)
-                _entries[i].ParentIndex = parentIdx;
+            ulong pFull = _parentRefs[i];
+            ushort pSeq = (ushort)(pFull >> 48);
+
+            if (_mftToIndex.TryGetValue(pFull & MftRefMask, out int parentIdx) && parentIdx != i)
+            {
+                ushort actualSeq = _selfSeqs[parentIdx];
+                if (pSeq != 0 && actualSeq != 0 && pSeq != actualSeq)
+                {
+                    _entries[i].ParentIndex = -1;
+                    _entries[i].Flags |= FlagDeleted;
+                    stale++;
+                }
+                else
+                {
+                    _entries[i].ParentIndex = parentIdx;
+                }
+            }
             else
             {
                 _entries[i].ParentIndex = -1;
@@ -115,55 +138,241 @@ public sealed class FileIndex
             }
         }
         _parentRefs = Array.Empty<ulong>();
+        _selfSeqs = Array.Empty<ushort>();
 
-        PropagateHiddenSystem();
+        if (stale > 0)
+        {
+            _needOrphanPurge = true;
+            PurgeOrphansIfNeeded();
+        }
+
+        int shadowed = RemoveShadowedDuplicates();
+        if (shadowed > 0)
+        {
+            _needOrphanPurge = true;
+            PurgeOrphansIfNeeded();
+        }
+
+        if (stale > 0 || shadowed > 0)
+        {
+            _mftToIndex.Clear();
+            for (int i = 0; i < _count; i++)
+            {
+                if ((_entries[i].Flags & FlagDeleted) != 0) continue;
+                _mftToIndex.TryAdd(_entries[i].MftRef, i);
+            }
+            RecountLive();
+        }
+        else
+        {
+            PropagateHiddenSystem();
+        }
+
+        StaleParentCount = stale;
+        ShadowedDuplicateCount = shadowed;
         return rootCount;
+    }
+
+    public int StaleParentCount { get; private set; }
+
+    public bool NameRankReady => System.Threading.Volatile.Read(ref _rankedCount) > 0;
+
+    public int UnrankedEstimate => Math.Max(0, _count - System.Threading.Volatile.Read(ref _rankedCount)) + _renamedSinceRank;
+
+    public (int[] Ranks, int Count) GetNameRankSnapshot()
+    {
+        var ranks = _nameRank;
+        int count = Math.Min(System.Threading.Volatile.Read(ref _rankedCount), ranks.Length);
+        return (ranks, count);
+    }
+
+    public void BuildNameRank()
+    {
+        if (System.Threading.Interlocked.Exchange(ref _rankBuilding, 1) == 1) return;
+        try
+        {
+            lock (this)
+            {
+                int n = _count;
+                var order = new int[n];
+                int live = 0;
+                for (int i = 0; i < n; i++)
+                    if ((_entries[i].Flags & FlagDeleted) == 0) order[live++] = i;
+
+                var k0 = new ulong[live];
+                var k1 = new ulong[live];
+                var pos = new int[live];
+                for (int k = 0; k < live; k++)
+                {
+                    var s = GetNameSpan(order[k]);
+                    k0[k] = NamePrefix(s, 0);
+                    k1[k] = NamePrefix(s, 4);
+                    pos[k] = k;
+                }
+
+                Array.Sort(pos, (a, b) =>
+                {
+                    int c = k0[a].CompareTo(k0[b]);
+                    if (c != 0) return c;
+                    c = k1[a].CompareTo(k1[b]);
+                    if (c != 0) return c;
+                    return GetNameSpan(order[a]).CompareTo(GetNameSpan(order[b]), StringComparison.OrdinalIgnoreCase);
+                });
+
+                var ranks = new int[n];
+                Array.Fill(ranks, -1);
+                for (int r = 0; r < live; r++) ranks[order[pos[r]]] = r;
+
+                _nameRank = ranks;
+                _renamedSinceRank = 0;
+                System.Threading.Volatile.Write(ref _rankedCount, n);
+            }
+        }
+        finally
+        {
+            System.Threading.Volatile.Write(ref _rankBuilding, 0);
+        }
+    }
+
+    private static ulong NamePrefix(ReadOnlySpan<char> s, int start)
+    {
+        ulong k = 0;
+        for (int i = 0; i < 4; i++)
+        {
+            int p = start + i;
+            char c = p < s.Length ? char.ToUpperInvariant(s[p]) : '\0';
+            k = (k << 16) | c;
+        }
+        return k;
+    }
+    public int ShadowedDuplicateCount { get; private set; }
+
+    private int RemoveShadowedDuplicates()
+    {
+        var seen = new Dictionary<long, int>(_count);
+        List<(int First, int Second)>? pairs = null;
+
+        for (int i = 0; i < _count; i++)
+        {
+            ref var e = ref _entries[i];
+            if ((e.Flags & FlagDeleted) != 0) continue;
+            if (e.ParentIndex < 0) continue;
+
+            var name = _pool.AsSpan(e.NameOffset, e.NameLength);
+            int h = string.GetHashCode(name, StringComparison.OrdinalIgnoreCase);
+            long key = ((long)e.ParentIndex << 32) | (uint)h;
+
+            if (seen.TryAdd(key, i)) continue;
+
+            int j = seen[key];
+            ref var f = ref _entries[j];
+            if (f.MftRef == e.MftRef) continue;
+            if (!name.Equals(_pool.AsSpan(f.NameOffset, f.NameLength), StringComparison.OrdinalIgnoreCase)) continue;
+
+            (pairs ??= new List<(int, int)>()).Add((j, i));
+        }
+
+        if (pairs is null) return 0;
+
+        int removed = 0;
+        foreach (var (a, b) in pairs)
+        {
+            if ((_entries[a].Flags & FlagDeleted) != 0 || (_entries[b].Flags & FlagDeleted) != 0) continue;
+
+            ulong real = QueryFileId(GetFullPath(a)) & MftRefMask;
+            int drop = real != 0 && real == _entries[b].MftRef ? a : b;
+
+            _entries[drop].Flags |= FlagDeleted;
+            removed++;
+        }
+        return removed;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct ByHandleFileInformation
+    {
+        public uint Attributes;
+        public uint CreationLow, CreationHigh;
+        public uint AccessLow, AccessHigh;
+        public uint WriteLow, WriteHigh;
+        public uint VolumeSerial;
+        public uint SizeHigh, SizeLow;
+        public uint Links;
+        public uint IndexHigh, IndexLow;
+    }
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern Microsoft.Win32.SafeHandles.SafeFileHandle CreateFileW(
+        string name, uint access, uint share, IntPtr security, uint disposition, uint flags, IntPtr template);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool GetFileInformationByHandle(
+        Microsoft.Win32.SafeHandles.SafeFileHandle handle, out ByHandleFileInformation info);
+
+    private static ulong QueryFileId(string? path)
+    {
+        if (string.IsNullOrEmpty(path)) return 0;
+        try
+        {
+            string p = path.StartsWith(@"\\?\", StringComparison.Ordinal) ? path : @"\\?\" + path;
+            using var h = CreateFileW(p, 0x80, 0x7, IntPtr.Zero, 3, 0x02000000, IntPtr.Zero);
+            if (h.IsInvalid) return 0;
+            if (!GetFileInformationByHandle(h, out var info)) return 0;
+            return ((ulong)info.IndexHigh << 32) | info.IndexLow;
+        }
+        catch
+        {
+            return 0;
+        }
     }
 
     public void PropagateHiddenSystem()
     {
-        var memo = new byte[_count];
-
-        var path = new int[256];
-
-        for (int i = 0; i < _count; i++)
+        lock (this)
         {
-            if (memo[i] != 0) continue;
+            var memo = new byte[_count];
 
-            int len = 0;
-            int cur = i;
-            byte resolved = 0; 
+            var path = new int[256];
 
-            while (cur >= 0)
+            for (int i = 0; i < _count; i++)
             {
-                if (memo[cur] != 0) { resolved = memo[cur]; break; }    
+                if (memo[i] != 0) continue;
 
-                bool isRoot = _entries[cur].ParentIndex < 0;
+                int len = 0;
+                int cur = i;
+                byte resolved = 0; 
 
-                if (!isRoot && (_entries[cur].Flags & FlagHiddenSystem) != 0)  
+                while (cur >= 0)
                 {
-                    memo[cur] = 1;
-                    resolved = 1;
-                    break;
+                    if (memo[cur] != 0) { resolved = memo[cur]; break; }    
+
+                    bool isRoot = _entries[cur].ParentIndex < 0;
+
+                    if (!isRoot && (_entries[cur].Flags & FlagHiddenSystem) != 0)  
+                    {
+                        memo[cur] = 1;
+                        resolved = 1;
+                        break;
+                    }
+                    if (len < path.Length) path[len] = cur;
+                    len++;
+                    cur = _entries[cur].ParentIndex;   
                 }
-                if (len < path.Length) path[len] = cur;
-                len++;
-                cur = _entries[cur].ParentIndex;   
+
+                if (resolved == 0) resolved = 2;
+
+                int fill = Math.Min(len, path.Length);
+                for (int k = 0; k < fill; k++)
+                    memo[path[k]] = resolved;
             }
 
-            if (resolved == 0) resolved = 2;
-
-            int fill = Math.Min(len, path.Length);
-            for (int k = 0; k < fill; k++)
-                memo[path[k]] = resolved;
-        }
-
-        for (int i = 0; i < _count; i++)
-        {
-            // 상속이 풀린 경우(2)에는 플래그를 지운다. 지우지 않으면 숨김 폴더 밖으로
-            // 옮겨진 항목이 계속 감춰진 채로 남는다.
-            if (memo[i] == 1)      _entries[i].Flags |= FlagHiddenSystemEffective;
-            else if (memo[i] == 2) _entries[i].Flags &= unchecked((ushort)~FlagHiddenSystemEffective);
+            for (int i = 0; i < _count; i++)
+            {
+                // 상속이 풀린 경우(2)에는 플래그를 지운다. 지우지 않으면 숨김 폴더 밖으로
+                // 옮겨진 항목이 계속 감춰진 채로 남는다.
+                if (memo[i] == 1)      _entries[i].Flags |= FlagHiddenSystemEffective;
+                else if (memo[i] == 2) _entries[i].Flags &= unchecked((ushort)~FlagHiddenSystemEffective);
+            }
         }
     }
 
@@ -246,60 +455,63 @@ public sealed class FileIndex
     /// <returns>실제로 정리한 항목이 있으면 true.</returns>
     public bool PurgeOrphansIfNeeded()
     {
-        if (!_needOrphanPurge) return false;
-        _needOrphanPurge = false;
-        if (_count == 0) return false;
-
-        // 0 = 미확인, 1 = 삭제됨(자신 또는 조상), 2 = 살아 있음
-        var memo = new byte[_count];
-        for (int i = 0; i < _count; i++)
-            if ((_entries[i].Flags & FlagDeleted) != 0) memo[i] = 1;
-
-        var path = new int[256];
-        int purged = 0;
-
-        for (int i = 0; i < _count; i++)
+        lock (this)
         {
-            if (memo[i] != 0) continue;
+            if (!_needOrphanPurge) return false;
+            _needOrphanPurge = false;
+            if (_count == 0) return false;
 
-            int len = 0;
-            int cur = i;
-            byte resolved = 0;
+            // 0 = 미확인, 1 = 삭제됨(자신 또는 조상), 2 = 살아 있음
+            var memo = new byte[_count];
+            for (int i = 0; i < _count; i++)
+                if ((_entries[i].Flags & FlagDeleted) != 0) memo[i] = 1;
 
-            while (cur >= 0)
+            var path = new int[256];
+            int purged = 0;
+
+            for (int i = 0; i < _count; i++)
             {
-                if (memo[cur] != 0) { resolved = memo[cur]; break; }
-                if (len < path.Length) path[len] = cur;
-                len++;
+                if (memo[i] != 0) continue;
 
-                int next = _entries[cur].ParentIndex;
-                if (next == cur) break;      // 자기 자신을 부모로 가리키는 손상 방지
-                cur = next;
+                int len = 0;
+                int cur = i;
+                byte resolved = 0;
+
+                while (cur >= 0)
+                {
+                    if (memo[cur] != 0) { resolved = memo[cur]; break; }
+                    if (len < path.Length) path[len] = cur;
+                    len++;
+
+                    int next = _entries[cur].ParentIndex;
+                    if (next == cur) break;      // 자기 자신을 부모로 가리키는 손상 방지
+                    cur = next;
+                }
+
+                if (resolved == 0) resolved = 2;
+
+                int fill = Math.Min(len, path.Length);
+                for (int k = 0; k < fill; k++)
+                {
+                    int idx = path[k];
+                    memo[idx] = resolved;
+
+                    if (resolved != 1) continue;
+                    if ((_entries[idx].Flags & FlagDeleted) != 0) continue;
+
+                    _entries[idx].Flags |= FlagDeleted;
+                    DecrementCount((_entries[idx].Flags & FlagDirectory) != 0);
+                    _mftToIndex.Remove(_entries[idx].MftRef);
+                    purged++;
+                }
             }
 
-            if (resolved == 0) resolved = 2;
+            // 폴더가 지워지거나 옮겨졌으므로 숨김+시스템 상속도 다시 계산한다.
+            // (휴지통으로 옮겨진 항목이 그 안에서 감춰지는 것이 이 계산의 효과다)
+            PropagateHiddenSystem();
 
-            int fill = Math.Min(len, path.Length);
-            for (int k = 0; k < fill; k++)
-            {
-                int idx = path[k];
-                memo[idx] = resolved;
-
-                if (resolved != 1) continue;
-                if ((_entries[idx].Flags & FlagDeleted) != 0) continue;
-
-                _entries[idx].Flags |= FlagDeleted;
-                DecrementCount((_entries[idx].Flags & FlagDirectory) != 0);
-                _mftToIndex.Remove(_entries[idx].MftRef);
-                purged++;
-            }
+            return purged > 0;
         }
-
-        // 폴더가 지워지거나 옮겨졌으므로 숨김+시스템 상속도 다시 계산한다.
-        // (휴지통으로 옮겨진 항목이 그 안에서 감춰지는 것이 이 계산의 효과다)
-        PropagateHiddenSystem();
-
-        return purged > 0;
     }
 
     /// <summary>
@@ -329,6 +541,13 @@ public sealed class FileIndex
         _entries[idx].NameOffset = _poolPos;
         _entries[idx].NameLength = (ushort)nameLen;
         _poolPos += nameLen;
+
+        var ranks = _nameRank;
+        if ((uint)idx < (uint)ranks.Length && ranks[idx] >= 0)
+        {
+            ranks[idx] = -1;
+            _renamedSinceRank++;
+        }
 
         // ── 부모(위치) 갱신 ──
         ulong parentKey = parentRef & MftRefMask;
@@ -375,14 +594,17 @@ public sealed class FileIndex
     /// </summary>
     public void RecountLive()
     {
-        long files = 0, dirs = 0;
-        for (int i = 0; i < _count; i++)
+        lock (this)
         {
-            if ((_entries[i].Flags & FlagDeleted) != 0) continue;
-            if ((_entries[i].Flags & FlagDirectory) != 0) dirs++; else files++;
+            long files = 0, dirs = 0;
+            for (int i = 0; i < _count; i++)
+            {
+                if ((_entries[i].Flags & FlagDeleted) != 0) continue;
+                if ((_entries[i].Flags & FlagDirectory) != 0) dirs++; else files++;
+            }
+            FileCount = files;
+            DirCount  = dirs;
         }
-        FileCount = files;
-        DirCount  = dirs;
     }
 
     /// <summary>
@@ -498,22 +720,25 @@ public sealed class FileIndex
 
     public void WriteTo(BinaryWriter bw)
     {
-        // 어긋난 값을 캐시에 남기지 않는다. 한 번 잘못 저장되면
-        // 다음 실행마다 그 값을 다시 읽어 계속 이어진다.
-        if (!CountsLookSane()) RecountLive();
+        lock (this)
+        {
+            // 어긋난 값을 캐시에 남기지 않는다. 한 번 잘못 저장되면
+            // 다음 실행마다 그 값을 다시 읽어 계속 이어진다.
+            if (!CountsLookSane()) RecountLive();
 
-        bw.Write(_count);
-        bw.Write(_poolPos);
+            bw.Write(_count);
+            bw.Write(_poolPos);
 
-        int entryBytes = _count * Unsafe.SizeOf<Entry>();
-        var span = MemoryMarshal.AsBytes(_entries.AsSpan(0, _count));
-        bw.Write(span);
+            int entryBytes = _count * Unsafe.SizeOf<Entry>();
+            var span = MemoryMarshal.AsBytes(_entries.AsSpan(0, _count));
+            bw.Write(span);
 
-        var charBytes = MemoryMarshal.AsBytes(_pool.AsSpan(0, _poolPos));
-        bw.Write(charBytes);
+            var charBytes = MemoryMarshal.AsBytes(_pool.AsSpan(0, _poolPos));
+            bw.Write(charBytes);
 
-        bw.Write(FileCount);
-        bw.Write(DirCount);
+            bw.Write(FileCount);
+            bw.Write(DirCount);
+        }
     }
 
     public static FileIndex ReadFrom(BinaryReader br)
@@ -555,6 +780,7 @@ public sealed class FileIndex
         }
 
         index._parentRefs = Array.Empty<ulong>();
+        index._selfSeqs = Array.Empty<ushort>();
 
         return index;
     }
