@@ -84,7 +84,7 @@ public partial class SettingsWindow : Window
         else if (!newValue && _initialRemovable)
             StatusText.Text = Loc.T("settings.usbOff");
         else
-            StatusText.Text = "";
+            StatusText.Text = Loc.T(newValue ? "settings.usbKeepOn" : "settings.usbKeepOff");
     }
 
     private static string NormalizeExcluded(string raw)

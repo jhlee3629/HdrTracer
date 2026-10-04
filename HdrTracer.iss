@@ -1,5 +1,5 @@
 #define MyAppName "HdrTracer"
-#define MyAppVersion "1.3.5"
+#define MyAppVersion "1.3.6"
 #define MyAppPublisher "HaeDream"
 #define MyAppExeName "HdrTracer.exe"
 
@@ -46,6 +46,7 @@ Name: "german";   MessagesFile: "compiler:Languages\German.isl"
 Name: "spanish";  MessagesFile: "compiler:Languages\Spanish.isl"
 Name: "french";   MessagesFile: "compiler:Languages\French.isl"
 Name: "japanese"; MessagesFile: "compiler:Languages\Japanese.isl"
+Name: "chinesesimplified"; MessagesFile: "ChineseSimplified.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked

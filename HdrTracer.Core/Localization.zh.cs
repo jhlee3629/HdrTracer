@@ -122,6 +122,8 @@ public static partial class Localization
         ["settings.ok"]        = "确定",
         ["settings.usbOn"]     = "点击确定后将开始索引 USB 驱动器。",
         ["settings.usbOff"]    = "点击确定后将从内存中移除已索引的 USB 数据。",
+        ["settings.usbKeepOn"] = "无更改：继续索引 USB 驱动器。",
+        ["settings.usbKeepOff"] = "无更改：继续不索引 USB 驱动器。",
         ["settings.autostart"]      = "开机时自动启动",
         ["settings.autostart.desc"] = "登录后自动在托盘中运行（使用任务计划程序，不会弹出 UAC）。",
         ["settings.autostart.fail"] = "更改自动启动设置失败。",

@@ -82,6 +82,9 @@ public partial class MainWindow : Window
 
         StateChanged += MainWindow_StateChanged;
 
+        foreach (var b in new[] { MinimizeButton, MaximizeButton, CloseButton })
+            b.PreviewMouseLeftButtonDown += TitleBarButton_PreviewMouseLeftButtonDown;
+
         _engine.HideHiddenSystemItems = !_settings.ShowHiddenSystemItems;
         _engine.ExcludedFolderNames = _settings.ExcludedFolders.ToArray();
 
@@ -934,9 +937,14 @@ public partial class MainWindow : Window
 
             if (_recentlyDeletedEntries.Count > 0)
             {
-                sortedRows = sortedRows
-                    .Where(r => !_recentlyDeletedEntries.ContainsKey((r.SourceIndex, r.EntryIndex)))
-                    .ToList();
+                sortedRows = sortedRows.Where(r =>
+                {
+                    var key = (r.SourceIndex, r.EntryIndex);
+                    if (!_recentlyDeletedEntries.ContainsKey(key)) return true;
+                    if (!RobustDelete.PathExists(r.Path)) return false;
+                    _recentlyDeletedEntries.Remove(key);
+                    return true;
+                }).ToList();
             }
 
             var prevSelected = new HashSet<(HdrTracer.Core.FileIndex, int)>();
@@ -2952,6 +2960,13 @@ public partial class MainWindow : Window
         catch { }
     }
 
+    private void TitleBarButton_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not Button b || !b.Focusable || b.IsKeyboardFocused) return;
+        b.Focusable = false;
+        Dispatcher.BeginInvoke(new Action(() => b.Focusable = true), System.Windows.Threading.DispatcherPriority.Input);
+    }
+
     private void MainWindow_StateChanged(object? sender, EventArgs e)
     {
         MaximizeButton.Content = WindowState == WindowState.Maximized ? "\uE923" : "\uE922";
@@ -3192,7 +3207,13 @@ public partial class MainWindow : Window
         _settings.Language = Loc.ToCode(lang);
         _settings.Save();
 
+        _footerNoticeTimer.Stop();
+        _footerNoticeUntil = DateTime.MinValue;
+        _footerBeforeSelection = null;
+
         ApplyLocalizedTexts();
+
+        if (EffectiveSelectedCount > 0) UpdateSelectionSummary();
     }
 
     private void ApplyLocalizedTexts()

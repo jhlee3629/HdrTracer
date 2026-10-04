@@ -124,6 +124,8 @@ public static partial class Localization
         ["settings.ok"]         = "확인",
         ["settings.usbOn"]      = "확인 누르면 USB 드라이브를 인덱싱합니다.",
         ["settings.usbOff"]     = "확인 누르면 인덱싱된 USB 데이터를 메모리에서 제거합니다.",
+        ["settings.usbKeepOn"]  = "변경 없음: USB 드라이브를 계속 인덱싱합니다.",
+        ["settings.usbKeepOff"] = "변경 없음: USB 드라이브를 계속 인덱싱하지 않습니다.",
         ["settings.autostart"]      = "Windows 시작 시 자동 실행",
         ["settings.autostart.desc"] = "로그인하면 트레이에 자동으로 실행됩니다. (작업 스케줄러 등록, UAC 없음)",
         ["settings.autostart.fail"] = "자동 실행 설정 변경에 실패했습니다.",

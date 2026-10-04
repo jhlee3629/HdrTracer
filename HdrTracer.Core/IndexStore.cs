@@ -54,6 +54,10 @@ public static class IndexStore
                 bw.Write((byte)1);
                 bw.Write(data.Index.NgramBuiltAtCount);
                 ngram.WriteTo(bw);
+
+                var renamed = data.Index.GetRenamedSinceNgram();
+                bw.Write(renamed.Length);
+                foreach (int r in renamed) bw.Write(r);
             }
             else
             {
@@ -94,6 +98,25 @@ public static class IndexStore
                 int builtAtCount = br.ReadInt32();
                 var ngram = NgramIndex.ReadFrom(br);
                 index.SetNgramIndex(ngram, builtAtCount);
+
+                if (fs.Length - fs.Position >= 4)
+                {
+                    int n = br.ReadInt32();
+                    if (n < 0 || n > index.Count || fs.Length - fs.Position < (long)n * 4)
+                    {
+                        index.ClearNgramIndex();
+                    }
+                    else if (n > 0)
+                    {
+                        var renamed = new int[n];
+                        for (int i = 0; i < n; i++) renamed[i] = br.ReadInt32();
+                        index.RestoreRenamedSinceNgram(renamed);
+                    }
+                }
+                else
+                {
+                    index.ClearNgramIndex();
+                }
             }
 
             return new CacheData

@@ -323,12 +323,15 @@ public sealed class SearchEngine
         {
             bool skipMatchCheck = (tokens.Length == 1 && !hasPattern);
             int ngramBuiltCount = index.NgramBuiltAtCount;
+            int[] renamed = index.GetRenamedSinceNgram();
+            HashSet<int>? renamedSet = renamed.Length > 0 ? new HashSet<int>(renamed) : null;
 
             if (skipMatchCheck)
             {
                 foreach (int j in candidates)
                 {
                     if (j >= count) continue;
+                    if (renamedSet is not null && renamedSet.Contains(j)) continue;
                     if (index.IsDeleted(j)) continue;
 
                     var name = index.GetNameSpan(j);
@@ -345,6 +348,7 @@ public sealed class SearchEngine
                 foreach (int j in candidates)
                 {
                     if (j >= count) continue;
+                    if (renamedSet is not null && renamedSet.Contains(j)) continue;
                     if (index.IsDeleted(j)) continue;
 
                     var name = index.GetNameSpan(j);
@@ -361,6 +365,22 @@ public sealed class SearchEngine
 
             for (int j = ngramBuiltCount; j < count; j++)
             {
+                if (index.IsDeleted(j)) continue;
+
+                var name = index.GetNameSpan(j);
+                if (!MatchesAll(name, tokens)) continue;
+                if (hasPattern && !MatchesAllPatterns(name, patterns)) continue;
+                if (hasExt && !MatchesExtension(name, extFilter)) continue;
+                if (hideHiddenSystem && index.IsHiddenSystemEffective(j)) continue;
+                if (excludeRecycle && IsInRecycleBin(index, j)) continue;
+                if (hasExcludedDir && IsInExcludedFolder(index, j, excludedNames)) continue;
+                if (hasExtra && !PassesExtraFilters(index, j, name, extra)) continue;
+                local.Add(new SearchHit(index, j));
+            }
+
+            foreach (int j in renamed)
+            {
+                if (j >= count || j >= ngramBuiltCount) continue;
                 if (index.IsDeleted(j)) continue;
 
                 var name = index.GetNameSpan(j);

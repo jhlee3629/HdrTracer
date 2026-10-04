@@ -122,6 +122,8 @@ public static partial class Localization
         ["settings.ok"]        = "OK",
         ["settings.usbOn"]     = "USB-Laufwerke werden nach dem Klick auf OK indiziert.",
         ["settings.usbOff"]    = "Indizierte USB-Daten werden nach dem Klick auf OK aus dem Speicher entfernt.",
+        ["settings.usbKeepOn"] = "Keine Änderung: USB-Laufwerke bleiben indiziert.",
+        ["settings.usbKeepOff"] = "Keine Änderung: USB-Laufwerke werden weiterhin nicht indiziert.",
         ["settings.autostart"]      = "Mit Windows starten",
         ["settings.autostart.desc"] = "Startet bei der Anmeldung automatisch im Infobereich (Aufgabenplanung, ohne UAC-Abfrage).",
         ["settings.autostart.fail"] = "Autostart konnte nicht geändert werden.",

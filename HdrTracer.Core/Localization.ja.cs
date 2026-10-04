@@ -122,6 +122,8 @@ public static partial class Localization
         ["settings.ok"]        = "OK",
         ["settings.usbOn"]     = "OK を押すと USB ドライブのインデックスを開始します。",
         ["settings.usbOff"]    = "OK を押すとインデックス済みの USB データをメモリから解放します。",
+        ["settings.usbKeepOn"] = "変更なし：USB ドライブのインデックスを維持します。",
+        ["settings.usbKeepOff"] = "変更なし：USB ドライブは引き続きインデックスしません。",
         ["settings.autostart"]      = "Windows 起動時に自動実行",
         ["settings.autostart.desc"] = "サインイン時にトレイで自動的に起動します（タスク スケジューラ、UAC なし）。",
         ["settings.autostart.fail"] = "自動実行の設定変更に失敗しました。",

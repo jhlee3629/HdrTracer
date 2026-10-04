@@ -123,6 +123,8 @@ public static partial class Localization
         ["settings.ok"]         = "OK",
         ["settings.usbOn"]      = "USB drives will be indexed when you click OK.",
         ["settings.usbOff"]     = "Indexed USB data will be removed from memory when you click OK.",
+        ["settings.usbKeepOn"]  = "No change: USB drives stay indexed.",
+        ["settings.usbKeepOff"] = "No change: USB drives stay out of the index.",
         ["settings.autostart"]      = "Start with Windows",
         ["settings.autostart.desc"] = "Runs in the tray automatically at sign-in (Task Scheduler, no UAC prompt).",
         ["settings.autostart.fail"] = "Failed to change the auto-start setting.",

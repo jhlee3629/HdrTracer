@@ -42,6 +42,8 @@ public sealed class FileIndex
     private int _renamedSinceRank;
     private int _rankBuilding;
 
+    private readonly HashSet<int> _renamedSinceNgram = new();
+
     /// <summary>배열에 자리를 차지한 항목 수. 삭제 표시된 것도 포함한다(내부용).</summary>
     public int Count => _count;
 
@@ -529,6 +531,8 @@ public sealed class FileIndex
         ulong key = mftRef & MftRefMask;
         if (!_mftToIndex.TryGetValue(key, out int idx)) return;
 
+        bool nameChanged = !GetNameSpan(idx).SequenceEqual(new ReadOnlySpan<char>(namePtr, nameLen));
+
         EnsurePoolCapacity(nameLen);
 
         fixed (char* poolPtr = _pool)
@@ -541,6 +545,8 @@ public sealed class FileIndex
         _entries[idx].NameOffset = _poolPos;
         _entries[idx].NameLength = (ushort)nameLen;
         _poolPos += nameLen;
+
+        if (nameChanged && idx < _ngramBuiltAtCount) _renamedSinceNgram.Add(idx);
 
         var ranks = _nameRank;
         if ((uint)idx < (uint)ranks.Length && ranks[idx] >= 0)
@@ -791,6 +797,27 @@ public sealed class FileIndex
         ng.BuildFromIndex(this);
         _ngram = ng;
         _ngramBuiltAtCount = _count;
+        _renamedSinceNgram.Clear();
+    }
+
+    public int[] GetRenamedSinceNgram()
+    {
+        lock (this)
+        {
+            if (_renamedSinceNgram.Count == 0) return Array.Empty<int>();
+            var arr = new int[_renamedSinceNgram.Count];
+            _renamedSinceNgram.CopyTo(arr);
+            return arr;
+        }
+    }
+
+    public void RestoreRenamedSinceNgram(int[] entries)
+    {
+        lock (this)
+        {
+            foreach (int i in entries)
+                if ((uint)i < (uint)_count && i < _ngramBuiltAtCount) _renamedSinceNgram.Add(i);
+        }
     }
 
     public void SetNgramIndex(NgramIndex ngram, int builtAtCount)
@@ -803,5 +830,6 @@ public sealed class FileIndex
     {
         _ngram = null;
         _ngramBuiltAtCount = 0;
+        _renamedSinceNgram.Clear();
     }
 }

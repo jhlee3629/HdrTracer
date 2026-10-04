@@ -122,6 +122,8 @@ public static partial class Localization
         ["settings.ok"]        = "OK",
         ["settings.usbOn"]     = "Les lecteurs USB seront indexés après validation.",
         ["settings.usbOff"]    = "Les données USB indexées seront libérées de la mémoire après validation.",
+        ["settings.usbKeepOn"] = "Aucun changement : les lecteurs USB restent indexés.",
+        ["settings.usbKeepOff"] = "Aucun changement : les lecteurs USB restent hors de l'index.",
         ["settings.autostart"]      = "Démarrer avec Windows",
         ["settings.autostart.desc"] = "Se lance automatiquement dans la zone de notification à l'ouverture de session (Planificateur de tâches, sans UAC).",
         ["settings.autostart.fail"] = "Impossible de modifier le démarrage automatique.",

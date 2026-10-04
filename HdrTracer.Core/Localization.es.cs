@@ -122,6 +122,8 @@ public static partial class Localization
         ["settings.ok"]        = "Aceptar",
         ["settings.usbOn"]     = "Las unidades USB se indexarán al pulsar Aceptar.",
         ["settings.usbOff"]    = "Los datos USB indexados se liberarán de la memoria al pulsar Aceptar.",
+        ["settings.usbKeepOn"] = "Sin cambios: las unidades USB siguen indexadas.",
+        ["settings.usbKeepOff"] = "Sin cambios: las unidades USB siguen sin indexarse.",
         ["settings.autostart"]      = "Iniciar con Windows",
         ["settings.autostart.desc"] = "Se ejecuta en la bandeja al iniciar sesión (Programador de tareas, sin aviso de UAC).",
         ["settings.autostart.fail"] = "No se pudo cambiar el inicio automático.",
